@@ -1,5 +1,3 @@
-# School Bus Arrival Tracker Web App
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,7 +7,7 @@
     <!-- Tailwind CSS for modern responsive dashboard styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom styles to optimize touch interactions for iPad */
+        /* Custom styles to optimize touch interactions for iPad/iPhone */
         .touch-target {
             min-height: 44px;
         }
@@ -19,7 +17,6 @@
         }
         .no-scrollbar {
             -ms-overflow-style: none;
-
             scrollbar-width: none;
         }
     </style>
@@ -39,7 +36,6 @@
                 </svg>
                 <div>
                     <h1 class="text-lg font-bold tracking-tight text-slate-900">BusSync Pro</h1>
-
                     <p class="text-xs text-slate-500 font-medium">School Arrival Management</p>
                 </div>
             </div>
@@ -55,11 +51,10 @@
     <!-- Main Dynamic Application Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col space-y-6">
         
-        <!-- Custom Alert Notification Toast (Replaces system alerts) -->
+        <!-- Custom Alert Notification Toast -->
         <div id="notification-toast" class="hidden fixed bottom-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-300 transform translate-y-10 opacity-0 z-50">
             <span id="toast-message" class="text-sm font-medium">Data logged successfully!</span>
         </div>
-
 
         <!-- Navigation Tabs: Split between Staff Input and Principal Back-End Review -->
         <div class="flex bg-slate-200/80 p-1 rounded-xl max-w-md w-full border border-slate-300/50 shadow-inner">
@@ -80,7 +75,6 @@
                 </div>
                 <!-- Dynamic Quick Add Form for unexpected sub routes -->
                 <div class="flex items-center space-x-2">
-
                     <input type="text" id="new-bus-number" placeholder="Add custom route #..." class="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40 touch-target font-medium">
                     <button onclick="addCustomBus()" class="bg-blue-600 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm touch-target flex items-center space-x-1">
                         <span>+ Add</span>
@@ -88,7 +82,7 @@
                 </div>
             </div>
 
-            <!-- Bus Cards Grid: Configured cleanly for iPad vertical or horizontal orientation -->
+            <!-- Bus Cards Grid -->
             <div id="bus-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <!-- Injected via JavaScript dynamically -->
             </div>
@@ -100,7 +94,6 @@
             <!-- Secure Pin Verification Wall Layer -->
             <div id="principal-auth-wall" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-xl text-center space-y-5 my-8">
                 <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">
-
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                     </svg>
@@ -120,7 +113,6 @@
 
             <!-- Inside Authenticated Back-End Dashboard View -->
             <div id="principal-dashboard-content" class="hidden space-y-6">
-
                 
                 <!-- Quick KPI Metrics Ribbon -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -140,7 +132,6 @@
                         <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">Flagged Incidents / Notes</div>
                         <div id="kpi-notes" class="text-2xl font-black text-rose-600 mt-1">0</div>
                     </div>
-
                 </div>
 
                 <!-- Exception Reports: Missing Buses & Late Arrivals Monitoring Board -->
@@ -160,7 +151,6 @@
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3 flex items-center space-x-1.5">
                             <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
-
                             <span>Late Arrivals (Logged After 9:25 AM)</span>
                         </h3>
                         <div id="late-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto">
@@ -176,12 +166,8 @@
                         <p class="text-xs text-slate-500 mt-0.5">Permanent, date-stamped records derived from the front-end logging workflow.</p>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <button onclick="exportToCSV()" class="bg-blue-50 text-blue-700 font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-blue-100 transition-colors border border-blue-200 flex items-center space-x-1.5 touch-target">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                            </svg>
-
-                            <span>Simulate CSV Export</span>
+                        <button onclick="refreshCloudData()" class="bg-blue-600 text-white font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-sm touch-target flex items-center space-x-1">
+                            <span>🔄 Force Sync Now</span>
                         </button>
                         <button onclick="clearDatabase()" class="bg-rose-50 text-rose-700 font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-rose-100 transition-colors border border-rose-200 touch-target">
                             Clear Current Database
@@ -200,12 +186,11 @@
                                     <th class="p-4 font-semibold">Assigned Fleet Bus</th>
                                     <th class="p-4 font-semibold">Substitution Bus</th>
                                     <th class="p-4 font-semibold">Recorded Arrival</th>
-
                                     <th class="p-4 font-semibold">Contextual Operational Notes</th>
                                 </tr>
                             </thead>
                             <tbody id="audit-table-body" class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
-                                <!-- Populated dynamically by script via submission arrays -->
+                                <!-- Populated dynamically by script -->
                             </tbody>
                         </table>
                     </div>
@@ -221,16 +206,21 @@
         </section>
     </main>
 
-
     <!-- App JavaScript Logic Core -->
     <script>
-        // ==========================================
-        // SECURITY CONFIGURATION
-        // Change "1234" to any PIN code or password you want the principal to use.
-        // ==========================================
+        // =========================================================================
+        // 1. SECURITY CONFIGURATION (Change "1234" to your preferred access PIN)
+        // =========================================================================
         const ADMIN_PIN = "5801";
 
-        // Set fixed configuration data and initial core states updated with real bus numbers
+        // =========================================================================
+        // 2. GOOGLE SHEETS WEB APP URL
+        // Paste your deployed Google Apps Script URL between the quotation marks below.
+        // If left as-is, the application defaults elegantly to safe offline local storage mode.
+        // =========================================================================
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec";
+
+        // Fixed set of actual school route parameters
         const DEFAULT_ROUTES = [
             "Bus 611", "Bus 628", "Bus 654", "Bus 655", "Bus 661", 
             "Bus 662", "Bus 668", "Bus 727", "Bus 743", "Bus 1058", 
@@ -241,27 +231,61 @@
         let submissionsLog = [];
 
         // Application Lifecycles Initialize
-
         window.onload = function() {
-            // Check for persistent browser data cache storage
+            startLiveClock();
+            
+            if (GOOGLE_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec" && GOOGLE_SCRIPT_URL) {
+                // Cloud Mode: Sync data with your Google Sheet instantly
+                refreshCloudData();
+                // Automatically look for background updates every 15 seconds (Perfect for the Principal's screen!)
+                setInterval(refreshCloudData, 15000);
+            } else {
+                // Local Mode Fallback
+                setupLocalStorageFallback();
+            }
+        };
+
+        function setupLocalStorageFallback() {
             if (localStorage.getItem('bus_submissions_db')) {
                 submissionsLog = JSON.parse(localStorage.getItem('bus_submissions_db'));
             }
             if (localStorage.getItem('active_bus_routes')) {
                 activeBuses = JSON.parse(localStorage.getItem('active_bus_routes'));
             }
-            
-            startLiveClock();
             renderStaffLoggingPanel();
             updatePrincipalDashboardUI();
-        };
+        }
+
+        // Centralized API pipeline helper for Google Sheets communication strings
+        function callGoogleScript(params, callback) {
+            const queryString = new URLSearchParams(params).toString();
+            fetch(`${GOOGLE_SCRIPT_URL}?${queryString}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (callback) callback(data);
+                })
+                .catch(error => {
+                    console.error("Google Sheets Sync Error:", error);
+                    showToastNotification("⚠️ Sheet Sync Error. Check web deployment permissions.");
+                });
+        }
+
+        function refreshCloudData() {
+            callGoogleScript({ action: "read" }, function(data) {
+                if (data) {
+                    submissionsLog = data.submissions || [];
+                    activeBuses = data.routes || [...DEFAULT_ROUTES];
+                    renderStaffLoggingPanel();
+                    updatePrincipalDashboardUI();
+                }
+            });
+        }
 
         // Real-time ticking device system synchronization
         function startLiveClock() {
             function updateClock() {
                 const now = new Date();
                 const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
-
                 const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
                 
                 document.getElementById('live-clock').innerText = now.toLocaleTimeString('en-US', timeOptions);
@@ -281,7 +305,6 @@
             if (viewTarget === 'logging') {
                 loggingTab.className = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-white text-blue-600 shadow-sm touch-target";
                 reviewTab.className = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 touch-target";
-
                 loggingView.classList.remove('hidden');
                 reviewView.classList.add('hidden');
             } else {
@@ -292,7 +315,7 @@
             }
         }
 
-        // Custom modal notification builder loop
+        // Custom toast notification modal loop
         function showToastNotification(textMessage) {
             const toast = document.getElementById('notification-toast');
             const message = document.getElementById('toast-message');
@@ -300,13 +323,10 @@
             message.innerText = textMessage;
             toast.classList.remove('hidden');
             
-            // Trigger animation layers
-
             setTimeout(() => {
                 toast.classList.remove('translate-y-10', 'opacity-0');
             }, 50);
 
-            // Close sequence
             setTimeout(() => {
                 toast.classList.add('translate-y-10', 'opacity-0');
                 setTimeout(() => {
@@ -315,14 +335,13 @@
             }, 3000);
         }
 
-        // Render input panels structured perfectly for easy thumb reach on iPad templates
+        // Render input panels structured perfectly for easy thumb reach on iPad/iPhone
         function renderStaffLoggingPanel() {
             const container = document.getElementById('bus-cards-container');
+            if (!container) return;
             container.innerHTML = '';
 
             activeBuses.forEach((busRoute, idx) => {
-
-                // Determine if this specific route card already has a matching logged entry
                 const currentSubmission = submissionsLog.find(item => item.routeId === busRoute);
                 
                 const card = document.createElement('div');
@@ -339,9 +358,7 @@
                 `;
 
                 if (currentSubmission) {
-                    // Show logged details block static state 
                     cardBodyMarkup += `
-
                         <div class="space-y-2 mb-4 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-100 p-3 rounded-xl">
                             <div class="flex justify-between"><span>Arrival Time:</span> <span class="text-slate-900 font-bold text-sm bg-emerald-100/60 text-emerald-800 px-1.5 py-0.5 rounded">${currentSubmission.arrivalTime}</span></div>
                             <div class="flex justify-between"><span>Substitution:</span> <span class="text-slate-900 font-bold">${currentSubmission.substitution || 'None (Standard)'}</span></div>
@@ -352,28 +369,21 @@
                         </button>
                     `;
                 } else {
-                    // Show action input field states
                     cardBodyMarkup += `
                         <div class="space-y-3 mb-4">
-                            <!-- Arrival Entry Fields Grid -->
                             <div>
                                 <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Arrival Timestamp</label>
                                 <div class="flex space-x-2">
                                     <input type="time" id="time-${idx}" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-semibold">
                                     <button onclick="stampCurrentTime(${idx})" class="bg-slate-900 text-white font-bold text-xs px-3 rounded-xl hover:bg-slate-800 transition-colors shadow-sm touch-target whitespace-nowrap">
-
                                         ⏱ Now
                                     </button>
                                 </div>
                             </div>
-
-                            <!-- Fleet Substitutions -->
                             <div>
                                 <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Fleet Sub Bus # (Optional)</label>
                                 <input type="text" id="sub-${idx}" placeholder="e.g. Bus 42-B" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-medium">
                             </div>
-
-                            <!-- Operational Logs -->
                             <div>
                                 <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Operational Notes / Comments</label>
                                 <textarea id="notes-${idx}" rows="2" placeholder="Delay details, parent complaints, etc." class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"></textarea>
@@ -381,7 +391,6 @@
                         </div>
                         <button onclick="submitBusRecord('${busRoute}', ${idx})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-md touch-target flex items-center justify-center space-x-1">
                             <span>✔ Log Arrival Data</span>
-
                         </button>
                     `;
                 }
@@ -391,16 +400,14 @@
             });
         }
 
-        // Automatic generation of local system timestamp values
         function stampCurrentTime(cardIndex) {
             const timeField = document.getElementById(`time-${cardIndex}`);
+            if (!timeField) return;
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             timeField.value = `${hours}:${minutes}`;
         }
-
-        // Form submission database interface pipelines
 
         function submitBusRecord(routeId, index) {
             const timeValue = document.getElementById(`time-${index}`).value;
@@ -412,37 +419,65 @@
                 return;
             }
 
-            const recordObject = {
-                id: 'log_' + Date.now(),
-                routeId: routeId,
-                arrivalTime: formatTime12H(timeValue),
-                rawTime: timeValue, // Native 24H string preserved for logical comparisons
-                substitution: subValue || 'None',
-                notes: notesValue || 'N/A',
-                timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-            };
+            const arrivalText = formatTime12H(timeValue);
 
-
-            submissionsLog.push(recordObject);
-            saveDataStateToStorage();
-            
-            renderStaffLoggingPanel();
-            updatePrincipalDashboardUI();
-            showToastNotification(`Successfully logged data entry for ${routeId}.`);
+            if (GOOGLE_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec" && GOOGLE_SCRIPT_URL) {
+                showToastNotification("Saving directly to Google Sheets...");
+                callGoogleScript({
+                    action: "submit",
+                    routeId: routeId,
+                    arrivalTime: arrivalText,
+                    rawTime: timeValue,
+                    substitution: subValue || 'None',
+                    notes: notesValue || 'N/A'
+                }, function(data) {
+                    if (data) {
+                        submissionsLog = data.submissions || [];
+                        renderStaffLoggingPanel();
+                        updatePrincipalDashboardUI();
+                        showToastNotification(`Successfully logged ${routeId} to Google Sheet!`);
+                    }
+                });
+            } else {
+                // Local Storage safe fallback tracking loop
+                const recordObject = {
+                    id: 'log_' + Date.now(),
+                    routeId: routeId,
+                    arrivalTime: arrivalText,
+                    rawTime: timeValue, 
+                    substitution: subValue || 'None',
+                    notes: notesValue || 'N/A',
+                    timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                };
+                submissionsLog.push(recordObject);
+                saveDataStateToStorage();
+                renderStaffLoggingPanel();
+                updatePrincipalDashboardUI();
+                showToastNotification(`Logged locally: ${routeId}`);
+            }
         }
 
-        // Reopen inputs to modify existing historical submissions
         function undoSubmission(routeId) {
-            submissionsLog = submissionsLog.filter(item => item.routeId !== routeId);
-            saveDataStateToStorage();
-            renderStaffLoggingPanel();
-            updatePrincipalDashboardUI();
-            showToastNotification("Submission record reopened for editing.");
+            if (GOOGLE_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec" && GOOGLE_SCRIPT_URL) {
+                showToastNotification("Reopening row entry inside Google Sheet...");
+                callGoogleScript({ action: "undo", routeId: routeId }, function(data) {
+                    if (data) {
+                        submissionsLog = data.submissions || [];
+                        renderStaffLoggingPanel();
+                        updatePrincipalDashboardUI();
+                        showToastNotification("Record reopened.");
+                    }
+                });
+            } else {
+                submissionsLog = submissionsLog.filter(item => item.routeId !== routeId);
+                saveDataStateToStorage();
+                renderStaffLoggingPanel();
+                updatePrincipalDashboardUI();
+                showToastNotification("Submission record reopened locally.");
+            }
         }
 
-        // Dynamic addition of non-standard context routes
         function addCustomBus() {
-
             const inputField = document.getElementById('new-bus-number');
             const newRouteName = inputField.value.trim();
 
@@ -452,16 +487,25 @@
                 return;
             }
 
-            activeBuses.push(newRouteName);
-            saveDataStateToStorage();
-            renderStaffLoggingPanel();
-            updatePrincipalDashboardUI();
-            
+            if (GOOGLE_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec" && GOOGLE_SCRIPT_URL) {
+                showToastNotification("Appending custom route row to cloud...");
+                callGoogleScript({ action: "addRoute", routeId: newRouteName }, function(data) {
+                    if (data) {
+                        activeBuses = data.routes || [...DEFAULT_ROUTES];
+                        renderStaffLoggingPanel();
+                        updatePrincipalDashboardUI();
+                        showToastNotification(`Route "${newRouteName}" appended to cloud.`);
+                    }
+                });
+            } else {
+                activeBuses.push(newRouteName);
+                saveDataStateToStorage();
+                renderStaffLoggingPanel();
+                updatePrincipalDashboardUI();
+                showToastNotification(`Custom Route "${newRouteName}" added locally.`);
+            }
             inputField.value = '';
-            showToastNotification(`Custom Route "${newRouteName}" appended.`);
         }
-
-        // Backend Authorization System Interface Controls
 
         function verifyAdminAccess() {
             const pinValue = document.getElementById('admin-pin').value;
@@ -469,19 +513,16 @@
             const authWall = document.getElementById('principal-auth-wall');
             const dashboardContent = document.getElementById('principal-dashboard-content');
 
-            // Verification checks against the centralized config variable
             if (pinValue === ADMIN_PIN) {
                 errorText.className = "hidden";
                 authWall.className = "hidden";
                 dashboardContent.className = "space-y-6";
-                showToastNotification("🔒 Access Granted. Back-end auditing metrics loaded.");
+                showToastNotification("🔒 Access Granted. Live spreadsheet data loaded.");
             } else {
                 errorText.classList.remove('hidden');
                 document.getElementById('admin-pin').value = '';
             }
         }
-
-        // Render up-to-date calculation arrays for Principal KPI overview charts
 
         function updatePrincipalDashboardUI() {
             const tableBody = document.getElementById('audit-table-body');
@@ -489,30 +530,23 @@
             const missingContainer = document.getElementById('missing-buses-list');
             const lateContainer = document.getElementById('late-buses-list');
             
-            // Calculate Exception metrics: Missing/Pending Buses and Late Arrivals (> 09:25)
             const loggedRouteIds = submissionsLog.map(item => item.routeId);
             const missingBuses = activeBuses.filter(bus => !loggedRouteIds.includes(bus));
-            
             const lateArrivals = submissionsLog.filter(item => item.rawTime && item.rawTime > "09:25");
             const onTimeCount = submissionsLog.length - lateArrivals.length;
 
-            // Set metrics counts on KPI cards
-            document.getElementById('kpi-total').innerText = submissionsLog.length;
-            document.getElementById('kpi-ontime').innerText = onTimeCount;
-            
-            // Compute operational flags safely
-            const subCounter = submissionsLog.filter(item => item.substitution !== 'None' && item.substitution !== '').length;
-
-            document.getElementById('kpi-subs').innerText = subCounter;
-            
-            const notesCounter = submissionsLog.filter(item => item.notes !== 'N/A' && item.notes !== '').length;
-            document.getElementById('kpi-notes').innerText = notesCounter;
+            if (document.getElementById('kpi-total')) {
+                document.getElementById('kpi-total').innerText = submissionsLog.length;
+                document.getElementById('kpi-ontime').innerText = onTimeCount;
+                document.getElementById('kpi-subs').innerText = submissionsLog.filter(item => item.substitution !== 'None' && item.substitution !== '').length;
+                document.getElementById('kpi-notes').innerText = submissionsLog.filter(item => item.notes !== 'N/A' && item.notes !== '').length;
+            }
 
             // Build Missing Buses Dashboard List
             if (missingContainer) {
                 missingContainer.innerHTML = '';
                 if (missingBuses.length === 0) {
-                    missingContainer.innerHTML = `<span class="text-xs text-slate-400 font-medium italic py-1">All standard and scheduled fleet units checked in.</span>`;
+                    missingContainer.innerHTML = `<span class="text-xs text-slate-400 font-medium italic py-1">All units accounted for.</span>`;
                 } else {
                     missingBuses.forEach(bus => {
                         const badge = document.createElement('span');
@@ -523,12 +557,11 @@
                 }
             }
 
-
             // Build Late Arrivals Dashboard List
             if (lateContainer) {
                 lateContainer.innerHTML = '';
                 if (lateArrivals.length === 0) {
-                    lateContainer.innerHTML = `<span class="text-xs text-emerald-600 font-medium italic py-1">Zero late exceptions recorded during this window.</span>`;
+                    lateContainer.innerHTML = `<span class="text-xs text-emerald-600 font-medium italic py-1">Zero late exceptions recorded today.</span>`;
                 } else {
                     lateArrivals.forEach(log => {
                         const badge = document.createElement('span');
@@ -542,16 +575,13 @@
                 }
             }
 
-            // Generate row layouts inside tabular audit sheets
-
+            // Generate Audit Table Data Log
             if (tableBody) {
                 tableBody.innerHTML = '';
                 if (submissionsLog.length === 0) {
                     emptyState.classList.remove('hidden');
                 } else {
                     emptyState.classList.add('hidden');
-                    
-                    // Sort backwards chronologically to show fresh data first
                     const sortedLogs = [...submissionsLog].reverse();
                     
                     sortedLogs.forEach(log => {
@@ -559,11 +589,10 @@
                         const row = document.createElement('tr');
                         row.className = `transition-colors border-b border-slate-100 ${isLate ? 'bg-rose-50/20 hover:bg-rose-50/40' : 'hover:bg-slate-50'}`;
                         row.innerHTML = `
-                            <td class="p-4 text-xs font-semibold tracking-tight text-slate-400 tabular-nums">${log.timestamp}</td>
+                            <td class="p-4 text-xs font-semibold tracking-tight text-slate-400 tabular-nums">${log.timestamp || 'Synced'}</td>
                             <td class="p-4 font-bold text-slate-900">${log.routeId}</td>
                             <td class="p-4 text-slate-500 font-medium">Standard Bus Fleet</td>
                             <td class="p-4">
-
                                 <span class="${log.substitution !== 'None' ? 'bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-bold text-xs' : 'text-slate-400 font-normal'}">
                                     ${log.substitution}
                                 </span>
@@ -580,52 +609,43 @@
             }
         }
 
-        // Local Storage System Data persistence interface loop
         function saveDataStateToStorage() {
             localStorage.setItem('bus_submissions_db', JSON.stringify(submissionsLog));
-
             localStorage.setItem('active_bus_routes', JSON.stringify(activeBuses));
         }
 
-        // Wipe clean current instance context state sets
         function clearDatabase() {
             if (confirm("Are you certain you want to purge all historical data submissions? This cannot be undone.")) {
-                submissionsLog = [];
-                activeBuses = [...DEFAULT_ROUTES];
-                saveDataStateToStorage();
-                renderStaffLoggingPanel();
-                updatePrincipalDashboardUI();
-                showToastNotification("Database wiped successfully.");
+                if (GOOGLE_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec" && GOOGLE_SCRIPT_URL) {
+                    showToastNotification("Wiping out remote cloud sheets rows...");
+                    callGoogleScript({ action: "clear" }, function(data) {
+                        if (data) {
+                            submissionsLog = data.submissions || [];
+                            activeBuses = data.routes || [...DEFAULT_ROUTES];
+                            renderStaffLoggingPanel();
+                            updatePrincipalDashboardUI();
+                            showToastNotification("Google Sheet reset successfully.");
+                        }
+                    });
+                } else {
+                    submissionsLog = [];
+                    activeBuses = [...DEFAULT_ROUTES];
+                    saveDataStateToStorage();
+                    renderStaffLoggingPanel();
+                    updatePrincipalDashboardUI();
+                    showToastNotification("Local Database wiped successfully.");
+                }
             }
         }
 
-        // Format system standard 24hr outputs smoothly to US standard 12hr timelines
         function formatTime12H(timeString) {
             if (!timeString) return '';
             const [hours, minutes] = timeString.split(':');
-
             const hh = parseInt(hours, 10);
             const suffix = hh >= 12 ? 'PM' : 'AM';
             const formattedHours = ((hh + 11) % 12 + 1);
             return `${formattedHours}:${minutes} ${suffix}`;
         }
-
-        // Simulated CSV spreadsheet export generation layer
-        function exportToCSV() {
-            if (submissionsLog.length === 0) {
-                showToastNotification("⚠️ Cannot export an empty database.");
-                return;
-            }
-            let csvContent = "data:text/csv;charset=utf-8,Timestamp,RouteID,Substitution,ArrivalTime,Notes\n";
-            submissionsLog.forEach(log => {
-                csvContent += `"${log.timestamp}","${log.routeId}","${log.substitution}","${log.arrivalTime}","${log.notes}"\n`;
-            });
-            const encodedUri = encodeURI(csvContent);
-            showToastNotification("📈 Export Simulated! Raw dataset structured successfully into CSV payload schema.");
-        }
-
     </script>
 </body>
 </html>
-
-
