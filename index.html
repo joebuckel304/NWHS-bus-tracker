@@ -143,6 +143,32 @@
 
                 </div>
 
+                <!-- Exception Reports: Missing Buses & Late Arrivals Monitoring Board -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Missing Buses Panel -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center space-x-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                            <span>Missing Check-Ins (Pending Fleet)</span>
+                        </h3>
+                        <div id="missing-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto">
+                            <!-- Injected dynamically via script -->
+                        </div>
+                    </div>
+                    
+                    <!-- Late Arrivals Panel -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3 flex items-center space-x-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+
+                            <span>Late Arrivals (Logged After 9:25 AM)</span>
+                        </h3>
+                        <div id="late-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto">
+                            <!-- Injected dynamically via script -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Back-end Log Review Toolbar Actions -->
                 <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
                     <div>
@@ -154,13 +180,13 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                             </svg>
+
                             <span>Simulate CSV Export</span>
                         </button>
                         <button onclick="clearDatabase()" class="bg-rose-50 text-rose-700 font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-rose-100 transition-colors border border-rose-200 touch-target">
                             Clear Current Database
                         </button>
                     </div>
-
                 </div>
 
                 <!-- Comprehensive Data Audit Table -->
@@ -174,13 +200,13 @@
                                     <th class="p-4 font-semibold">Assigned Fleet Bus</th>
                                     <th class="p-4 font-semibold">Substitution Bus</th>
                                     <th class="p-4 font-semibold">Recorded Arrival</th>
+
                                     <th class="p-4 font-semibold">Contextual Operational Notes</th>
                                 </tr>
                             </thead>
                             <tbody id="audit-table-body" class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
                                 <!-- Populated dynamically by script via submission arrays -->
                             </tbody>
-
                         </table>
                     </div>
                     <!-- Empty State Fallback -->
@@ -195,12 +221,12 @@
         </section>
     </main>
 
+
     <!-- App JavaScript Logic Core -->
     <script>
         // Set fixed configuration data and initial core states updated with real bus numbers
         const DEFAULT_ROUTES = [
             "Bus 611", "Bus 628", "Bus 654", "Bus 655", "Bus 661", 
-
             "Bus 662", "Bus 668", "Bus 727", "Bus 743", "Bus 1058", 
             "Bus 1061", "Bus 1072", "Bus 1096", "Bus 1107", "Bus 1119", 
             "Bus 1121", "Bus 1355", "Bus 1379", "Bus 1561"
@@ -215,12 +241,12 @@
                 submissionsLog = JSON.parse(localStorage.getItem('bus_submissions_db'));
             }
             if (localStorage.getItem('active_bus_routes')) {
+
                 activeBuses = JSON.parse(localStorage.getItem('active_bus_routes'));
             }
             
             startLiveClock();
             renderStaffLoggingPanel();
-
             updatePrincipalDashboardUI();
         };
 
@@ -235,12 +261,12 @@
                 document.getElementById('live-date').innerText = now.toLocaleDateString('en-US', dateOptions);
             }
             updateClock();
+
             setInterval(updateClock, 1000);
         }
 
         // Navigation tab switching handler engine
         function switchTab(viewTarget) {
-
             const loggingTab = document.getElementById('tab-logging');
             const reviewTab = document.getElementById('tab-review');
             const loggingView = document.getElementById('view-logging');
@@ -255,12 +281,12 @@
                 reviewTab.className = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-white text-blue-600 shadow-sm touch-target";
                 loggingTab.className = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 touch-target";
                 loggingView.classList.add('hidden');
+
                 reviewView.classList.remove('hidden');
             }
         }
 
         // Custom modal notification builder loop
-
         function showToastNotification(textMessage) {
             const toast = document.getElementById('notification-toast');
             const message = document.getElementById('toast-message');
@@ -275,12 +301,12 @@
 
             // Close sequence
             setTimeout(() => {
+
                 toast.classList.add('translate-y-10', 'opacity-0');
                 setTimeout(() => {
                     toast.classList.add('hidden');
                 }, 300);
             }, 3000);
-
         }
 
         // Render input panels structured perfectly for easy thumb reach on iPad templates
@@ -295,12 +321,12 @@
                 const card = document.createElement('div');
                 card.className = `p-5 rounded-2xl border transition-all duration-200 bg-white ${currentSubmission ? 'border-emerald-200 ring-2 ring-emerald-500/10 shadow-sm' : 'border-slate-200 hover:border-slate-300 shadow-sm'}`;
                 
+
                 let cardBodyMarkup = `
                     <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                         <div class="flex items-center space-x-2">
                             <span class="w-2.5 h-2.5 rounded-full ${currentSubmission ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}"></span>
                             <h3 class="text-base font-bold text-slate-900">${busRoute}</h3>
-
                         </div>
                         ${currentSubmission ? '<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Logged</span>' : '<span class="bg-slate-50 border border-slate-200 text-slate-500 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Pending</span>'}
                     </div>
@@ -315,12 +341,12 @@
                             <div class="pt-1.5 border-t border-slate-200/60 text-slate-500"><span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes:</span><p class="text-slate-800 mt-0.5 italic font-medium">"${currentSubmission.notes || 'No contextual updates added.'}"</p></div>
                         </div>
                         <button onclick="undoSubmission('${busRoute}')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-xs py-2.5 rounded-xl transition-colors touch-target">
+
                             Edit Submission Record
                         </button>
                     `;
                 } else {
                     // Show action input field states
-
                     cardBodyMarkup += `
                         <div class="space-y-3 mb-4">
                             <!-- Arrival Entry Fields Grid -->
@@ -335,11 +361,11 @@
                             </div>
 
                             <!-- Fleet Substitutions -->
+
                             <div>
                                 <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Fleet Sub Bus # (Optional)</label>
                                 <input type="text" id="sub-${idx}" placeholder="e.g. Bus 42-B" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-medium">
                             </div>
-
 
                             <!-- Operational Logs -->
                             <div>
@@ -355,12 +381,12 @@
 
                 card.innerHTML = cardBodyMarkup;
                 container.appendChild(card);
+
             });
         }
 
         // Automatic generation of local system timestamp values
         function stampCurrentTime(cardIndex) {
-
             const timeField = document.getElementById(`time-${cardIndex}`);
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
@@ -375,15 +401,16 @@
             const notesValue = document.getElementById(`notes-${index}`).value.trim();
 
             if (!timeValue) {
+
                 showToastNotification("⚠️ Please specify an arrival time before submitting.");
                 return;
             }
 
             const recordObject = {
-
                 id: 'log_' + Date.now(),
                 routeId: routeId,
                 arrivalTime: formatTime12H(timeValue),
+                rawTime: timeValue, // Native 24H string preserved for logical comparisons
                 substitution: subValue || 'None',
                 notes: notesValue || 'N/A',
                 timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -394,13 +421,13 @@
             
             renderStaffLoggingPanel();
             updatePrincipalDashboardUI();
+
             showToastNotification(`Successfully logged data entry for ${routeId}.`);
         }
 
         // Reopen inputs to modify existing historical submissions
         function undoSubmission(routeId) {
             submissionsLog = submissionsLog.filter(item => item.routeId !== routeId);
-
             saveDataStateToStorage();
             renderStaffLoggingPanel();
             updatePrincipalDashboardUI();
@@ -414,14 +441,15 @@
 
             if (!newRouteName) return;
             if (activeBuses.includes(newRouteName)) {
+
                 showToastNotification("⚠️ This route ID is already registered.");
                 return;
             }
 
             activeBuses.push(newRouteName);
             saveDataStateToStorage();
-
             renderStaffLoggingPanel();
+            updatePrincipalDashboardUI();
             
             inputField.value = '';
             showToastNotification(`Custom Route "${newRouteName}" appended.`);
@@ -434,13 +462,13 @@
             const authWall = document.getElementById('principal-auth-wall');
             const dashboardContent = document.getElementById('principal-dashboard-content');
 
+
             // Default demo verification gate (1234)
             if (pinValue === '1234') {
-                errorText.classList.add('hidden');
-                authWall.classList.add('hidden');
-                dashboardContent.classList.remove('hidden');
+                errorText.className = "hidden";
+                authWall.className = "hidden";
+                dashboardContent.className = "space-y-6";
                 showToastNotification("🔒 Access Granted. Back-end auditing metrics loaded.");
-
             } else {
                 errorText.classList.remove('hidden');
                 document.getElementById('admin-pin').value = '';
@@ -451,47 +479,98 @@
         function updatePrincipalDashboardUI() {
             const tableBody = document.getElementById('audit-table-body');
             const emptyState = document.getElementById('table-empty-state');
+            const missingContainer = document.getElementById('missing-buses-list');
+            const lateContainer = document.getElementById('late-buses-list');
             
-            // Set basic total counters
+
+            // Calculate Exception metrics: Missing/Pending Buses and Late Arrivals (> 09:25)
+            const loggedRouteIds = submissionsLog.map(item => item.routeId);
+            const missingBuses = activeBuses.filter(bus => !loggedRouteIds.includes(bus));
+            
+            const lateArrivals = submissionsLog.filter(item => item.rawTime && item.rawTime > "09:25");
+            const onTimeCount = submissionsLog.length - lateArrivals.length;
+
+            // Set metrics counts on KPI cards
             document.getElementById('kpi-total').innerText = submissionsLog.length;
-            document.getElementById('kpi-ontime').innerText = submissionsLog.length; // Placeholder assumption baseline
+            document.getElementById('kpi-ontime').innerText = onTimeCount;
             
             // Compute operational flags safely
             const subCounter = submissionsLog.filter(item => item.substitution !== 'None' && item.substitution !== '').length;
             document.getElementById('kpi-subs').innerText = subCounter;
             
-
             const notesCounter = submissionsLog.filter(item => item.notes !== 'N/A' && item.notes !== '').length;
             document.getElementById('kpi-notes').innerText = notesCounter;
 
-            // Generate row layouts inside tabular audit sheets
-            tableBody.innerHTML = '';
-            if (submissionsLog.length === 0) {
-                emptyState.classList.remove('hidden');
-            } else {
-                emptyState.classList.add('hidden');
-                
-                // Sort backwards chronologically to show fresh data first
-                const sortedLogs = [...submissionsLog].reverse();
-                
-                sortedLogs.forEach(log => {
-                    const row = document.createElement('tr');
-                    row.className = "hover:bg-slate-50 transition-colors border-b border-slate-100";
-                    row.innerHTML = `
-                        <td class="p-4 text-xs font-semibold tracking-tight text-slate-400 tabular-nums">${log.timestamp}</td>
-                        <td class="p-4 font-bold text-slate-900">${log.routeId}</td>
+            // Build Missing Buses Dashboard List
 
-                        <td class="p-4 text-slate-500 font-medium">Standard Bus Fleet</td>
-                        <td class="p-4">
-                            <span class="${log.substitution !== 'None' ? 'bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-bold text-xs' : 'text-slate-400 font-normal'}">
-                                ${log.substitution}
-                            </span>
-                        </td>
-                        <td class="p-4 font-bold text-blue-600 bg-blue-50/50 tabular-nums">${log.arrivalTime}</td>
-                        <td class="p-4 text-xs max-w-xs truncate text-slate-600 font-medium" title="${log.notes}">${log.notes}</td>
-                    `;
-                    tableBody.appendChild(row);
-                });
+            if (missingContainer) {
+                missingContainer.innerHTML = '';
+                if (missingBuses.length === 0) {
+                    missingContainer.innerHTML = `<span class="text-xs text-slate-400 font-medium italic py-1">All standard and scheduled fleet units checked in.</span>`;
+                } else {
+                    missingBuses.forEach(bus => {
+                        const badge = document.createElement('span');
+                        badge.className = "bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
+                        badge.innerText = bus;
+                        missingContainer.appendChild(badge);
+                    });
+                }
+            }
+
+            // Build Late Arrivals Dashboard List
+            if (lateContainer) {
+                lateContainer.innerHTML = '';
+                if (lateArrivals.length === 0) {
+                    lateContainer.innerHTML = `<span class="text-xs text-emerald-600 font-medium italic py-1">Zero late exceptions recorded during this window.</span>`;
+
+                } else {
+                    lateArrivals.forEach(log => {
+                        const badge = document.createElement('span');
+                        badge.className = "bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm flex items-center space-x-1.5";
+                        badge.innerHTML = `
+                            <span>${log.routeId}</span>
+                            <span class="bg-rose-200 text-rose-800 font-extrabold px-1.5 py-0.5 rounded text-[10px] tabular-nums">${log.arrivalTime}</span>
+                        `;
+                        lateContainer.appendChild(badge);
+                    });
+                }
+            }
+
+            // Generate row layouts inside tabular audit sheets
+            if (tableBody) {
+                tableBody.innerHTML = '';
+                if (submissionsLog.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+
+                    emptyState.classList.add('hidden');
+                    
+                    // Sort backwards chronologically to show fresh data first
+                    const sortedLogs = [...submissionsLog].reverse();
+                    
+                    sortedLogs.forEach(log => {
+                        const isLate = log.rawTime && log.rawTime > "09:25";
+                        const row = document.createElement('tr');
+                        row.className = `transition-colors border-b border-slate-100 ${isLate ? 'bg-rose-50/20 hover:bg-rose-50/40' : 'hover:bg-slate-50'}`;
+                        row.innerHTML = `
+                            <td class="p-4 text-xs font-semibold tracking-tight text-slate-400 tabular-nums">${log.timestamp}</td>
+                            <td class="p-4 font-bold text-slate-900">${log.routeId}</td>
+                            <td class="p-4 text-slate-500 font-medium">Standard Bus Fleet</td>
+                            <td class="p-4">
+                                <span class="${log.substitution !== 'None' ? 'bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-bold text-xs' : 'text-slate-400 font-normal'}">
+                                    ${log.substitution}
+                                </span>
+                            </td>
+                            <td class="p-4 font-bold tabular-nums ${isLate ? 'text-rose-600 bg-rose-50/60' : 'text-blue-600 bg-blue-50/50'}">
+
+                                <div>${log.arrivalTime}</div>
+                                ${isLate ? '<span class="inline-block bg-rose-600 text-white text-[9px] font-black tracking-wider px-1 rounded mt-0.5">LATE (>9:25)</span>' : ''}
+                            </td>
+                            <td class="p-4 text-xs max-w-xs truncate text-slate-600 font-medium" title="${log.notes}">${log.notes}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
             }
         }
 
@@ -501,9 +580,9 @@
             localStorage.setItem('active_bus_routes', JSON.stringify(activeBuses));
         }
 
-
         // Wipe clean current instance context state sets
         function clearDatabase() {
+
             if (confirm("Are you certain you want to purge all historical data submissions? This cannot be undone.")) {
                 submissionsLog = [];
                 activeBuses = [...DEFAULT_ROUTES];
@@ -521,9 +600,9 @@
             const hh = parseInt(hours, 10);
             const suffix = hh >= 12 ? 'PM' : 'AM';
             const formattedHours = ((hh + 11) % 12 + 1);
-
             return `${formattedHours}:${minutes} ${suffix}`;
         }
+
 
         // Simulated CSV spreadsheet export generation layer
         function exportToCSV() {
