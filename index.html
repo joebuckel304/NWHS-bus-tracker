@@ -1,0 +1,540 @@
+# School Bus Arrival Tracker Web App
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Bus Arrival Tracker</title>
+    <!-- Tailwind CSS for modern responsive dashboard styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles to optimize touch interactions for iPad */
+        .touch-target {
+            min-height: 44px;
+        }
+        /* Hide scrollbars but keep functionality */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <!-- Bus SVG Icon -->
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                    <rect x="2" width="20" height="12" y="6" rx="2" stroke="currentColor" stroke-width="2"></rect>
+                    <circle cx="6" cy="18" r="2"></circle>
+                    <circle cx="18" cy="18" r="2"></circle>
+                </svg>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-slate-900">BusSync Pro</h1>
+
+                    <p class="text-xs text-slate-500 font-medium">School Arrival Management</p>
+                </div>
+            </div>
+            
+            <!-- Real-time Clock display optimized for operators tracking time -->
+            <div class="text-right hidden sm:block">
+                <div id="live-date" class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Wednesday, August 12, 2026</div>
+                <div id="live-clock" class="text-lg font-bold text-slate-700 tabular-nums">12:00:00 PM</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dynamic Application Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col space-y-6">
+        
+        <!-- Custom Alert Notification Toast (Replaces system alerts) -->
+        <div id="notification-toast" class="hidden fixed bottom-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-300 transform translate-y-10 opacity-0 z-50">
+            <span id="toast-message" class="text-sm font-medium">Data logged successfully!</span>
+        </div>
+
+
+        <!-- Navigation Tabs: Split between Staff Input and Principal Back-End Review -->
+        <div class="flex bg-slate-200/80 p-1 rounded-xl max-w-md w-full border border-slate-300/50 shadow-inner">
+            <button id="tab-logging" onclick="switchTab('logging')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-white text-blue-600 shadow-sm touch-target">
+                Staff Logging Panel
+            </button>
+            <button id="tab-review" onclick="switchTab('review')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 touch-target">
+                Principal Portal
+            </button>
+        </div>
+
+        <!-- VIEW 1: STAFF LOGGING SCREEN -->
+        <section id="view-logging" class="space-y-6">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900">Active Bus Check-In</h2>
+                    <p class="text-sm text-slate-500 mt-0.5">Select a bus route below to log arrival records instantly.</p>
+                </div>
+                <!-- Dynamic Quick Add Form for unexpected sub routes -->
+                <div class="flex items-center space-x-2">
+
+                    <input type="text" id="new-bus-number" placeholder="Add custom route #..." class="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40 touch-target font-medium">
+                    <button onclick="addCustomBus()" class="bg-blue-600 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm touch-target flex items-center space-x-1">
+                        <span>+ Add</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bus Cards Grid: Configured cleanly for iPad vertical or horizontal orientation -->
+            <div id="bus-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Injected via JavaScript dynamically -->
+            </div>
+        </section>
+
+        <!-- VIEW 2: PRINCIPAL PORTAL BACK-END ACCESS -->
+        <section id="view-review" class="hidden space-y-6">
+            
+            <!-- Secure Pin Verification Wall Layer -->
+            <div id="principal-auth-wall" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-xl text-center space-y-5 my-8">
+                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">
+
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Administrator Verification</h3>
+                    <p class="text-xs text-slate-500 mt-1">Enter your administrative password or master access PIN code to view back-end database submissions.</p>
+                </div>
+                <div class="space-y-2">
+                    <input type="password" id="admin-pin" placeholder="Enter Admin Password (Try 1234)" class="w-full text-center border border-slate-300 rounded-xl py-3 px-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest font-mono">
+                    <p id="auth-error" class="text-xs text-red-600 hidden font-medium">Incorrect administrative credentials. Please try again.</p>
+                </div>
+                <button onclick="verifyAdminAccess()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800 transition-colors shadow-md touch-target">
+                    Authorize & Enter Panel
+                </button>
+            </div>
+
+            <!-- Inside Authenticated Back-End Dashboard View -->
+            <div id="principal-dashboard-content" class="hidden space-y-6">
+
+                
+                <!-- Quick KPI Metrics Ribbon -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Submissions</div>
+                        <div id="kpi-total" class="text-2xl font-black text-slate-900 mt-1">0</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">On-Time Arrivals</div>
+                        <div id="kpi-ontime" class="text-2xl font-black text-emerald-600 mt-1">0</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-amber-500 uppercase tracking-wider">Substituted Buses</div>
+                        <div id="kpi-subs" class="text-2xl font-black text-amber-600 mt-1">0</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">Flagged Incidents / Notes</div>
+                        <div id="kpi-notes" class="text-2xl font-black text-rose-600 mt-1">0</div>
+                    </div>
+
+                </div>
+
+                <!-- Back-end Log Review Toolbar Actions -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Submission Audit History Logs</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Permanent, date-stamped records derived from the front-end logging workflow.</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="exportToCSV()" class="bg-blue-50 text-blue-700 font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-blue-100 transition-colors border border-blue-200 flex items-center space-x-1.5 touch-target">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            <span>Simulate CSV Export</span>
+                        </button>
+                        <button onclick="clearDatabase()" class="bg-rose-50 text-rose-700 font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-rose-100 transition-colors border border-rose-200 touch-target">
+                            Clear Current Database
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- Comprehensive Data Audit Table -->
+                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div class="overflow-x-auto no-scrollbar">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+                                    <th class="p-4 font-semibold">Logged At Timestamp</th>
+                                    <th class="p-4 font-semibold">Route ID</th>
+                                    <th class="p-4 font-semibold">Assigned Fleet Bus</th>
+                                    <th class="p-4 font-semibold">Substitution Bus</th>
+                                    <th class="p-4 font-semibold">Recorded Arrival</th>
+                                    <th class="p-4 font-semibold">Contextual Operational Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-table-body" class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
+                                <!-- Populated dynamically by script via submission arrays -->
+                            </tbody>
+
+                        </table>
+                    </div>
+                    <!-- Empty State Fallback -->
+                    <div id="table-empty-state" class="hidden text-center py-12 text-slate-400">
+                        <svg class="w-12 h-12 mx-auto mb-3 opacity-60 text-slate-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m16.5 0v-3.432a1.242 1.242 0 00-1.242-1.242H5.196a1.242 1.242 0 00-1.242 1.242V7.5m16.5 0l-3.57-3.57M3.75 7.5l3.57-3.57m0 0A8.966 8.966 0 0112 3.75c1.74 0 3.358.491 4.723 1.341M8.25 10.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm9 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"></path>
+                        </svg>
+                        <p class="text-sm font-semibold">No bus data has been submitted for this session yet.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- App JavaScript Logic Core -->
+    <script>
+        // Set fixed configuration data and initial core states
+        const DEFAULT_ROUTES = ["Route 14", "Route 22", "Route 45-A", "Route 88", "Route 112", "Route 204"];
+        let activeBuses = [...DEFAULT_ROUTES];
+
+        let submissionsLog = [];
+
+        // Application Lifecycles Initialize
+        window.onload = function() {
+            // Check for persistent browser data cache storage
+            if (localStorage.getItem('bus_submissions_db')) {
+                submissionsLog = JSON.parse(localStorage.getItem('bus_submissions_db'));
+            }
+            if (localStorage.getItem('active_bus_routes')) {
+                activeBuses = JSON.parse(localStorage.getItem('active_bus_routes'));
+            }
+            
+            startLiveClock();
+            renderStaffLoggingPanel();
+            updatePrincipalDashboardUI();
+        };
+
+        // Real-time ticking device system synchronization
+        function startLiveClock() {
+
+            function updateClock() {
+                const now = new Date();
+                const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+                const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                
+                document.getElementById('live-clock').innerText = now.toLocaleTimeString('en-US', timeOptions);
+                document.getElementById('live-date').innerText = now.toLocaleDateString('en-US', dateOptions);
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        // Navigation tab switching handler engine
+        function switchTab(viewTarget) {
+            const loggingTab = document.getElementById('tab-logging');
+            const reviewTab = document.getElementById('tab-review');
+            const loggingView = document.getElementById('view-logging');
+            const reviewView = document.getElementById('view-review');
+
+
+            if (viewTarget === 'logging') {
+                loggingTab.className = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-white text-blue-600 shadow-sm touch-target";
+                reviewTab.className = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 touch-target";
+                loggingView.classList.remove('hidden');
+                reviewView.classList.add('hidden');
+            } else {
+                reviewTab.className = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-white text-blue-600 shadow-sm touch-target";
+                loggingTab.className = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 touch-target";
+                loggingView.classList.add('hidden');
+                reviewView.classList.remove('hidden');
+            }
+        }
+
+        // Custom modal notification builder loop
+        function showToastNotification(textMessage) {
+            const toast = document.getElementById('notification-toast');
+            const message = document.getElementById('toast-message');
+            
+            message.innerText = textMessage;
+
+            toast.classList.remove('hidden');
+            
+            // Trigger animation layers
+            setTimeout(() => {
+                toast.classList.remove('translate-y-10', 'opacity-0');
+            }, 50);
+
+            // Close sequence
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 300);
+            }, 3000);
+        }
+
+        // Render input panels structured perfectly for easy thumb reach on iPad templates
+        function renderStaffLoggingPanel() {
+            const container = document.getElementById('bus-cards-container');
+
+            container.innerHTML = '';
+
+            activeBuses.forEach((busRoute, idx) => {
+                // Determine if this specific route card already has a matching logged entry
+                const currentSubmission = submissionsLog.find(item => item.routeId === busRoute);
+                
+                const card = document.createElement('div');
+                card.className = `p-5 rounded-2xl border transition-all duration-200 bg-white ${currentSubmission ? 'border-emerald-200 ring-2 ring-emerald-500/10 shadow-sm' : 'border-slate-200 hover:border-slate-300 shadow-sm'}`;
+                
+                let cardBodyMarkup = `
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full ${currentSubmission ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}"></span>
+                            <h3 class="text-base font-bold text-slate-900">${busRoute}</h3>
+                        </div>
+                        ${currentSubmission ? '<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Logged</span>' : '<span class="bg-slate-50 border border-slate-200 text-slate-500 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Pending</span>'}
+                    </div>
+                `;
+
+
+                if (currentSubmission) {
+                    // Show logged details block static state 
+                    cardBodyMarkup += `
+                        <div class="space-y-2 mb-4 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-100 p-3 rounded-xl">
+                            <div class="flex justify-between"><span>Arrival Time:</span> <span class="text-slate-900 font-bold text-sm bg-emerald-100/60 text-emerald-800 px-1.5 py-0.5 rounded">${currentSubmission.arrivalTime}</span></div>
+                            <div class="flex justify-between"><span>Substitution:</span> <span class="text-slate-900 font-bold">${currentSubmission.substitution || 'None (Standard)'}</span></div>
+                            <div class="pt-1.5 border-t border-slate-200/60 text-slate-500"><span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes:</span><p class="text-slate-800 mt-0.5 italic font-medium">"${currentSubmission.notes || 'No contextual updates added.'}"</p></div>
+                        </div>
+                        <button onclick="undoSubmission('${busRoute}')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-xs py-2.5 rounded-xl transition-colors touch-target">
+                            Edit Submission Record
+                        </button>
+                    `;
+                } else {
+                    // Show action input field states
+                    cardBodyMarkup += `
+                        <div class="space-y-3 mb-4">
+                            <!-- Arrival Entry Fields Grid -->
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Arrival Timestamp</label>
+
+                                <div class="flex space-x-2">
+                                    <input type="time" id="time-${idx}" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-semibold">
+                                    <button onclick="stampCurrentTime(${idx})" class="bg-slate-900 text-white font-bold text-xs px-3 rounded-xl hover:bg-slate-800 transition-colors shadow-sm touch-target whitespace-nowrap">
+                                        ⏱ Now
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Fleet Substitutions -->
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Fleet Sub Bus # (Optional)</label>
+                                <input type="text" id="sub-${idx}" placeholder="e.g. Bus 42-B" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-medium">
+                            </div>
+
+                            <!-- Operational Logs -->
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Operational Notes / Comments</label>
+                                <textarea id="notes-${idx}" rows="2" placeholder="Delay details, parent complaints, etc." class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"></textarea>
+                            </div>
+
+                        </div>
+                        <button onclick="submitBusRecord('${busRoute}', ${idx})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-md touch-target flex items-center justify-center space-x-1">
+                            <span>✔ Log Arrival Data</span>
+                        </button>
+                    `;
+                }
+
+                card.innerHTML = cardBodyMarkup;
+                container.appendChild(card);
+            });
+        }
+
+        // Automatic generation of local system timestamp values
+        function stampCurrentTime(cardIndex) {
+            const timeField = document.getElementById(`time-${cardIndex}`);
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            timeField.value = `${hours}:${minutes}`;
+
+        }
+
+        // Form submission database interface pipelines
+        function submitBusRecord(routeId, index) {
+            const timeValue = document.getElementById(`time-${index}`).value;
+            const subValue = document.getElementById(`sub-${index}`).value.trim();
+            const notesValue = document.getElementById(`notes-${index}`).value.trim();
+
+            if (!timeValue) {
+                showToastNotification("⚠️ Please specify an arrival time before submitting.");
+                return;
+            }
+
+            const recordObject = {
+                id: 'log_' + Date.now(),
+                routeId: routeId,
+                arrivalTime: formatTime12H(timeValue),
+                substitution: subValue || 'None',
+                notes: notesValue || 'N/A',
+
+                timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            };
+
+            submissionsLog.push(recordObject);
+            saveDataStateToStorage();
+            
+            renderStaffLoggingPanel();
+            updatePrincipalDashboardUI();
+            showToastNotification(`Successfully logged data entry for ${routeId}.`);
+        }
+
+        // Reopen inputs to modify existing historical submissions
+        function undoSubmission(routeId) {
+            submissionsLog = submissionsLog.filter(item => item.routeId !== routeId);
+            saveDataStateToStorage();
+            renderStaffLoggingPanel();
+            updatePrincipalDashboardUI();
+            showToastNotification("Submission record reopened for editing.");
+        }
+
+
+        // Dynamic addition of non-standard context routes
+        function addCustomBus() {
+            const inputField = document.getElementById('new-bus-number');
+            const newRouteName = inputField.value.trim();
+
+            if (!newRouteName) return;
+            if (activeBuses.includes(newRouteName)) {
+                showToastNotification("⚠️ This route ID is already registered.");
+                return;
+            }
+
+            activeBuses.push(newRouteName);
+            saveDataStateToStorage();
+            renderStaffLoggingPanel();
+            
+            inputField.value = '';
+            showToastNotification(`Custom Route "${newRouteName}" appended.`);
+        }
+
+
+        // Backend Authorization System Interface Controls
+        function verifyAdminAccess() {
+            const pinValue = document.getElementById('admin-pin').value;
+            const errorText = document.getElementById('auth-error');
+            const authWall = document.getElementById('principal-auth-wall');
+            const dashboardContent = document.getElementById('principal-dashboard-content');
+
+            // Default demo verification gate (1234)
+            if (pinValue === '1234') {
+                errorText.classList.add('hidden');
+                authWall.classList.add('hidden');
+                dashboardContent.classList.remove('hidden');
+                showToastNotification("🔒 Access Granted. Back-end auditing metrics loaded.");
+            } else {
+                errorText.classList.remove('hidden');
+                document.getElementById('admin-pin').value = '';
+            }
+        }
+
+
+        // Render up-to-date calculation arrays for Principal KPI overview charts
+        function updatePrincipalDashboardUI() {
+            const tableBody = document.getElementById('audit-table-body');
+            const emptyState = document.getElementById('table-empty-state');
+            
+            // Set basic total counters
+            document.getElementById('kpi-total').innerText = submissionsLog.length;
+            document.getElementById('kpi-ontime').innerText = submissionsLog.length; // Placeholder assumption baseline
+            
+            // Compute operational flags safely
+            const subCounter = submissionsLog.filter(item => item.substitution !== 'None' && item.substitution !== '').length;
+            document.getElementById('kpi-subs').innerText = subCounter;
+            
+            const notesCounter = submissionsLog.filter(item => item.notes !== 'N/A' && item.notes !== '').length;
+            document.getElementById('kpi-notes').innerText = notesCounter;
+
+            // Generate row layouts inside tabular audit sheets
+            tableBody.innerHTML = '';
+            if (submissionsLog.length === 0) {
+
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                
+                // Sort backwards chronologically to show fresh data first
+                const sortedLogs = [...submissionsLog].reverse();
+                
+                sortedLogs.forEach(log => {
+                    const row = document.createElement('tr');
+                    row.className = "hover:bg-slate-50 transition-colors border-b border-slate-100";
+                    row.innerHTML = `
+                        <td class="p-4 text-xs font-semibold tracking-tight text-slate-400 tabular-nums">${log.timestamp}</td>
+                        <td class="p-4 font-bold text-slate-900">${log.routeId}</td>
+                        <td class="p-4 text-slate-500 font-medium">Standard Bus Fleet</td>
+                        <td class="p-4">
+                            <span class="${log.substitution !== 'None' ? 'bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-bold text-xs' : 'text-slate-400 font-normal'}">
+                                ${log.substitution}
+                            </span>
+                        </td>
+
+                        <td class="p-4 font-bold text-blue-600 bg-blue-50/50 tabular-nums">${log.arrivalTime}</td>
+                        <td class="p-4 text-xs max-w-xs truncate text-slate-600 font-medium" title="${log.notes}">${log.notes}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+        }
+
+        // Local Storage System Data persistence interface loop
+        function saveDataStateToStorage() {
+            localStorage.setItem('bus_submissions_db', JSON.stringify(submissionsLog));
+            localStorage.setItem('active_bus_routes', JSON.stringify(activeBuses));
+        }
+
+        // Wipe clean current instance context state sets
+        function clearDatabase() {
+            if (confirm("Are you certain you want to purge all historical data submissions? This cannot be undone.")) {
+                submissionsLog = [];
+                activeBuses = [...DEFAULT_ROUTES];
+
+                saveDataStateToStorage();
+                renderStaffLoggingPanel();
+                updatePrincipalDashboardUI();
+                showToastNotification("Database wiped successfully.");
+            }
+        }
+
+        // Format system standard 24hr outputs smoothly to US standard 12hr timelines
+        function formatTime12H(timeString) {
+            if (!timeString) return '';
+            const [hours, minutes] = timeString.split(':');
+            const hh = parseInt(hours, 10);
+            const suffix = hh >= 12 ? 'PM' : 'AM';
+            const formattedHours = ((hh + 11) % 12 + 1);
+            return `${formattedHours}:${minutes} ${suffix}`;
+        }
+
+        // Simulated CSV spreadsheet export generation layer
+        function exportToCSV() {
+
+            if (submissionsLog.length === 0) {
+                showToastNotification("⚠️ Cannot export an empty database.");
+                return;
+            }
+            let csvContent = "data:text/csv;charset=utf-8,Timestamp,RouteID,Substitution,ArrivalTime,Notes\n";
+            submissionsLog.forEach(log => {
+                csvContent += `"${log.timestamp}","${log.routeId}","${log.substitution}","${log.arrivalTime}","${log.notes}"\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            showToastNotification("📈 Export Simulated! Raw dataset structured successfully into CSV payload schema.");
+        }
+    </script>
+</body>
+</html>
+
+
