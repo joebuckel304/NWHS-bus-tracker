@@ -197,10 +197,15 @@
 
     <!-- App JavaScript Logic Core -->
     <script>
-        // Set fixed configuration data and initial core states
-        const DEFAULT_ROUTES = ["Route 14", "Route 22", "Route 45-A", "Route 88", "Route 112", "Route 204"];
-        let activeBuses = [...DEFAULT_ROUTES];
+        // Set fixed configuration data and initial core states updated with real bus numbers
+        const DEFAULT_ROUTES = [
+            "Bus 611", "Bus 628", "Bus 654", "Bus 655", "Bus 661", 
 
+            "Bus 662", "Bus 668", "Bus 727", "Bus 743", "Bus 1058", 
+            "Bus 1061", "Bus 1072", "Bus 1096", "Bus 1107", "Bus 1119", 
+            "Bus 1121", "Bus 1355", "Bus 1379", "Bus 1561"
+        ];
+        let activeBuses = [...DEFAULT_ROUTES];
         let submissionsLog = [];
 
         // Application Lifecycles Initialize
@@ -215,12 +220,12 @@
             
             startLiveClock();
             renderStaffLoggingPanel();
+
             updatePrincipalDashboardUI();
         };
 
         // Real-time ticking device system synchronization
         function startLiveClock() {
-
             function updateClock() {
                 const now = new Date();
                 const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
@@ -235,11 +240,11 @@
 
         // Navigation tab switching handler engine
         function switchTab(viewTarget) {
+
             const loggingTab = document.getElementById('tab-logging');
             const reviewTab = document.getElementById('tab-review');
             const loggingView = document.getElementById('view-logging');
             const reviewView = document.getElementById('view-review');
-
 
             if (viewTarget === 'logging') {
                 loggingTab.className = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-white text-blue-600 shadow-sm touch-target";
@@ -255,12 +260,12 @@
         }
 
         // Custom modal notification builder loop
+
         function showToastNotification(textMessage) {
             const toast = document.getElementById('notification-toast');
             const message = document.getElementById('toast-message');
             
             message.innerText = textMessage;
-
             toast.classList.remove('hidden');
             
             // Trigger animation layers
@@ -275,12 +280,12 @@
                     toast.classList.add('hidden');
                 }, 300);
             }, 3000);
+
         }
 
         // Render input panels structured perfectly for easy thumb reach on iPad templates
         function renderStaffLoggingPanel() {
             const container = document.getElementById('bus-cards-container');
-
             container.innerHTML = '';
 
             activeBuses.forEach((busRoute, idx) => {
@@ -295,11 +300,11 @@
                         <div class="flex items-center space-x-2">
                             <span class="w-2.5 h-2.5 rounded-full ${currentSubmission ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}"></span>
                             <h3 class="text-base font-bold text-slate-900">${busRoute}</h3>
+
                         </div>
                         ${currentSubmission ? '<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Logged</span>' : '<span class="bg-slate-50 border border-slate-200 text-slate-500 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Pending</span>'}
                     </div>
                 `;
-
 
                 if (currentSubmission) {
                     // Show logged details block static state 
@@ -315,12 +320,12 @@
                     `;
                 } else {
                     // Show action input field states
+
                     cardBodyMarkup += `
                         <div class="space-y-3 mb-4">
                             <!-- Arrival Entry Fields Grid -->
                             <div>
                                 <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Arrival Timestamp</label>
-
                                 <div class="flex space-x-2">
                                     <input type="time" id="time-${idx}" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-semibold">
                                     <button onclick="stampCurrentTime(${idx})" class="bg-slate-900 text-white font-bold text-xs px-3 rounded-xl hover:bg-slate-800 transition-colors shadow-sm touch-target whitespace-nowrap">
@@ -335,12 +340,12 @@
                                 <input type="text" id="sub-${idx}" placeholder="e.g. Bus 42-B" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-medium">
                             </div>
 
+
                             <!-- Operational Logs -->
                             <div>
                                 <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Operational Notes / Comments</label>
                                 <textarea id="notes-${idx}" rows="2" placeholder="Delay details, parent complaints, etc." class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"></textarea>
                             </div>
-
                         </div>
                         <button onclick="submitBusRecord('${busRoute}', ${idx})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-md touch-target flex items-center justify-center space-x-1">
                             <span>✔ Log Arrival Data</span>
@@ -355,12 +360,12 @@
 
         // Automatic generation of local system timestamp values
         function stampCurrentTime(cardIndex) {
+
             const timeField = document.getElementById(`time-${cardIndex}`);
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             timeField.value = `${hours}:${minutes}`;
-
         }
 
         // Form submission database interface pipelines
@@ -375,12 +380,12 @@
             }
 
             const recordObject = {
+
                 id: 'log_' + Date.now(),
                 routeId: routeId,
                 arrivalTime: formatTime12H(timeValue),
                 substitution: subValue || 'None',
                 notes: notesValue || 'N/A',
-
                 timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
             };
 
@@ -395,12 +400,12 @@
         // Reopen inputs to modify existing historical submissions
         function undoSubmission(routeId) {
             submissionsLog = submissionsLog.filter(item => item.routeId !== routeId);
+
             saveDataStateToStorage();
             renderStaffLoggingPanel();
             updatePrincipalDashboardUI();
             showToastNotification("Submission record reopened for editing.");
         }
-
 
         // Dynamic addition of non-standard context routes
         function addCustomBus() {
@@ -415,12 +420,12 @@
 
             activeBuses.push(newRouteName);
             saveDataStateToStorage();
+
             renderStaffLoggingPanel();
             
             inputField.value = '';
             showToastNotification(`Custom Route "${newRouteName}" appended.`);
         }
-
 
         // Backend Authorization System Interface Controls
         function verifyAdminAccess() {
@@ -435,12 +440,12 @@
                 authWall.classList.add('hidden');
                 dashboardContent.classList.remove('hidden');
                 showToastNotification("🔒 Access Granted. Back-end auditing metrics loaded.");
+
             } else {
                 errorText.classList.remove('hidden');
                 document.getElementById('admin-pin').value = '';
             }
         }
-
 
         // Render up-to-date calculation arrays for Principal KPI overview charts
         function updatePrincipalDashboardUI() {
@@ -455,13 +460,13 @@
             const subCounter = submissionsLog.filter(item => item.substitution !== 'None' && item.substitution !== '').length;
             document.getElementById('kpi-subs').innerText = subCounter;
             
+
             const notesCounter = submissionsLog.filter(item => item.notes !== 'N/A' && item.notes !== '').length;
             document.getElementById('kpi-notes').innerText = notesCounter;
 
             // Generate row layouts inside tabular audit sheets
             tableBody.innerHTML = '';
             if (submissionsLog.length === 0) {
-
                 emptyState.classList.remove('hidden');
             } else {
                 emptyState.classList.add('hidden');
@@ -475,13 +480,13 @@
                     row.innerHTML = `
                         <td class="p-4 text-xs font-semibold tracking-tight text-slate-400 tabular-nums">${log.timestamp}</td>
                         <td class="p-4 font-bold text-slate-900">${log.routeId}</td>
+
                         <td class="p-4 text-slate-500 font-medium">Standard Bus Fleet</td>
                         <td class="p-4">
                             <span class="${log.substitution !== 'None' ? 'bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-bold text-xs' : 'text-slate-400 font-normal'}">
                                 ${log.substitution}
                             </span>
                         </td>
-
                         <td class="p-4 font-bold text-blue-600 bg-blue-50/50 tabular-nums">${log.arrivalTime}</td>
                         <td class="p-4 text-xs max-w-xs truncate text-slate-600 font-medium" title="${log.notes}">${log.notes}</td>
                     `;
@@ -496,12 +501,12 @@
             localStorage.setItem('active_bus_routes', JSON.stringify(activeBuses));
         }
 
+
         // Wipe clean current instance context state sets
         function clearDatabase() {
             if (confirm("Are you certain you want to purge all historical data submissions? This cannot be undone.")) {
                 submissionsLog = [];
                 activeBuses = [...DEFAULT_ROUTES];
-
                 saveDataStateToStorage();
                 renderStaffLoggingPanel();
                 updatePrincipalDashboardUI();
@@ -516,12 +521,12 @@
             const hh = parseInt(hours, 10);
             const suffix = hh >= 12 ? 'PM' : 'AM';
             const formattedHours = ((hh + 11) % 12 + 1);
+
             return `${formattedHours}:${minutes} ${suffix}`;
         }
 
         // Simulated CSV spreadsheet export generation layer
         function exportToCSV() {
-
             if (submissionsLog.length === 0) {
                 showToastNotification("⚠️ Cannot export an empty database.");
                 return;
