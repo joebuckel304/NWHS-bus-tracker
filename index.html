@@ -4,1591 +4,590 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>School Bus Arrival Tracker</title>
-
     <script src="https://cdn.tailwindcss.com"></script>
-
     <style>
-        .touch-target {
-            min-height: 44px;
-        }
-
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
+        .touch-target { min-height: 44px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white">
 
-    <!-- TOP NAVIGATION -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+<header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                <rect x="2" width="20" height="12" y="6" rx="2"></rect>
+                <circle cx="6" cy="18" r="2"></circle>
+                <circle cx="18" cy="18" r="2"></circle>
+            </svg>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight text-slate-900">BusSync Pro</h1>
+                <p class="text-xs text-slate-500 font-medium">School Arrival Management</p>
+            </div>
+        </div>
+        <div class="text-right hidden sm:block">
+            <div id="live-date" class="text-xs font-semibold text-slate-500 uppercase tracking-wider"></div>
+            <div id="live-clock" class="text-lg font-bold text-slate-700 tabular-nums"></div>
+        </div>
+    </div>
+</header>
 
-            <div class="flex items-center space-x-3">
-                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <rect x="2" width="20" height="12" y="6" rx="2"></rect>
-                    <circle cx="6" cy="18" r="2"></circle>
-                    <circle cx="18" cy="18" r="2"></circle>
-                </svg>
+<main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col space-y-6">
+    <div id="notification-toast" class="hidden fixed bottom-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl z-50">
+        <span id="toast-message" class="text-sm font-medium"></span>
+    </div>
 
-                <div>
-                    <h1 class="text-lg font-bold tracking-tight text-slate-900">
-                        BusSync Pro
-                    </h1>
-                    <p class="text-xs text-slate-500 font-medium">
-                        School Arrival Management
-                    </p>
+    <div class="flex bg-slate-200/80 p-1 rounded-xl max-w-md w-full border border-slate-300/50 shadow-inner">
+        <button id="tab-logging" onclick="switchTab('logging')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target">Staff Logging Panel</button>
+        <button id="tab-review" onclick="switchTab('review')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target">Principal Portal</button>
+    </div>
+
+    <section id="view-logging" class="space-y-6">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">Active Bus Check-In</h2>
+                <p class="text-sm text-slate-500 mt-0.5">Select a bus route below to log arrival records instantly.</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <input type="text" id="new-bus-number" placeholder="Add custom route #..." class="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40 touch-target font-medium">
+                <button onclick="addCustomBus()" class="bg-blue-600 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm touch-target">+ Add</button>
+            </div>
+        </div>
+        <div id="bus-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </section>
+
+    <section id="view-review" class="hidden space-y-6">
+        <div id="principal-auth-wall" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-xl text-center space-y-5 my-8">
+            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">🔒</div>
+            <div>
+                <h3 class="text-lg font-bold text-slate-900">Administrator Verification</h3>
+                <p class="text-xs text-slate-500 mt-1">Enter your administrative password or master access PIN code.</p>
+            </div>
+            <div class="space-y-2">
+                <input type="password" id="admin-pin" placeholder="Enter Admin Password" class="w-full text-center border border-slate-300 rounded-xl py-3 px-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest font-mono">
+                <p id="auth-error" class="text-xs text-red-600 hidden font-medium">Incorrect administrative credentials. Please try again.</p>
+            </div>
+            <button onclick="verifyAdminAccess()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800 transition-colors shadow-md touch-target">Authorize & Enter Panel</button>
+        </div>
+
+        <div id="principal-dashboard-content" class="hidden space-y-6">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Submissions</div>
+                    <div id="kpi-total" class="text-2xl font-black text-slate-900 mt-1">0</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">On-Time Arrivals</div>
+                    <div id="kpi-ontime" class="text-2xl font-black text-emerald-600 mt-1">0</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold text-amber-500 uppercase tracking-wider">Substituted Buses</div>
+                    <div id="kpi-subs" class="text-2xl font-black text-amber-600 mt-1">0</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">Flagged Incidents / Notes</div>
+                    <div id="kpi-notes" class="text-2xl font-black text-rose-600 mt-1">0</div>
                 </div>
             </div>
 
-            <div class="text-right hidden sm:block">
-                <div id="live-date"
-                     class="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Missing Check-Ins (Pending Fleet)</h3>
+                    <div id="missing-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
-
-                <div id="live-clock"
-                     class="text-lg font-bold text-slate-700 tabular-nums">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3">Late Arrivals (Logged After 9:25 AM)</h3>
+                    <div id="late-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
             </div>
 
-        </div>
-    </header>
-
-
-    <!-- MAIN APP -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col space-y-6">
-
-        <!-- NOTIFICATION -->
-        <div id="notification-toast"
-             class="hidden fixed bottom-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-300 transform translate-y-10 opacity-0 z-50">
-
-            <span id="toast-message" class="text-sm font-medium">
-                Data logged successfully!
-            </span>
-
-        </div>
-
-
-        <!-- TABS -->
-        <div class="flex bg-slate-200/80 p-1 rounded-xl max-w-md w-full border border-slate-300/50 shadow-inner">
-
-            <button id="tab-logging"
-                    onclick="switchTab('logging')"
-                    class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-white text-blue-600 shadow-sm touch-target">
-
-                Staff Logging Panel
-
-            </button>
-
-            <button id="tab-review"
-                    onclick="switchTab('review')"
-                    class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 touch-target">
-
-                Principal Portal
-
-            </button>
-
-        </div>
-
-
-        <!-- STAFF LOGGING VIEW -->
-        <section id="view-logging" class="space-y-6">
-
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <h2 class="text-xl font-bold text-slate-900">
-                        Active Bus Check-In
-                    </h2>
-
-                    <p class="text-sm text-slate-500 mt-0.5">
-                        Select a bus route below to log arrival records instantly.
-                    </p>
+                    <h2 class="text-lg font-bold text-slate-900">Submission Audit History Logs</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Historical Google Sheet records are retained permanently. Reset only starts a new app session.</p>
                 </div>
-
-
                 <div class="flex items-center space-x-2">
-
-                    <input type="text"
-                           id="new-bus-number"
-                           placeholder="Add custom route #..."
-                           class="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40 touch-target font-medium">
-
-                    <button onclick="addCustomBus()"
-                            class="bg-blue-600 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm touch-target">
-
-                        + Add
-
-                    </button>
-
+                    <button onclick="resetTodayView()" class="bg-slate-100 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-slate-200 transition-colors border border-slate-200 touch-target">Reset Today's View</button>
                 </div>
-
             </div>
 
-
-            <!-- BUS CARDS -->
-            <div id="bus-cards-container"
-                 class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto no-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+                                <th class="p-4 font-semibold">Date</th>
+                                <th class="p-4 font-semibold">Logged At</th>
+                                <th class="p-4 font-semibold">Route ID</th>
+                                <th class="p-4 font-semibold">Assigned Fleet Bus</th>
+                                <th class="p-4 font-semibold">Substitution Bus</th>
+                                <th class="p-4 font-semibold">Recorded Arrival</th>
+                                <th class="p-4 font-semibold">Operational Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-table-body" class="divide-y divide-slate-100 text-sm font-medium text-slate-700"></tbody>
+                    </table>
+                </div>
+                <div id="table-empty-state" class="hidden text-center py-12 text-slate-400">
+                    <p class="text-sm font-semibold">No bus data has been submitted yet.</p>
+                </div>
             </div>
-
-        </section>
-
-
-        <!-- PRINCIPAL VIEW -->
-        <section id="view-review" class="hidden space-y-6">
-
-
-            <!-- AUTH WALL -->
-            <div id="principal-auth-wall"
-                 class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-xl text-center space-y-5 my-8">
-
-                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">
-                    🔒
-                </div>
-
-                <div>
-                    <h3 class="text-lg font-bold text-slate-900">
-                        Administrator Verification
-                    </h3>
-
-                    <p class="text-xs text-slate-500 mt-1">
-                        Enter your administrative password or master access PIN code.
-                    </p>
-                </div>
-
-                <div class="space-y-2">
-
-                    <input type="password"
-                           id="admin-pin"
-                           placeholder="Enter Admin Password"
-                           class="w-full text-center border border-slate-300 rounded-xl py-3 px-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest font-mono">
-
-                    <p id="auth-error"
-                       class="text-xs text-red-600 hidden font-medium">
-
-                        Incorrect administrative credentials. Please try again.
-
-                    </p>
-
-                </div>
-
-                <button onclick="verifyAdminAccess()"
-                        class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800 transition-colors shadow-md touch-target">
-
-                    Authorize & Enter Panel
-
-                </button>
-
-            </div>
-
-
-            <!-- PRINCIPAL DASHBOARD -->
-            <div id="principal-dashboard-content"
-                 class="hidden space-y-6">
-
-
-                <!-- KPI -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                            Total Submissions
-                        </div>
-
-                        <div id="kpi-total"
-                             class="text-2xl font-black text-slate-900 mt-1">
-                            0
-                        </div>
-                    </div>
-
-
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">
-                            On-Time Arrivals
-                        </div>
-
-                        <div id="kpi-ontime"
-                             class="text-2xl font-black text-emerald-600 mt-1">
-                            0
-                        </div>
-                    </div>
-
-
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <div class="text-xs font-bold text-amber-500 uppercase tracking-wider">
-                            Substituted Buses
-                        </div>
-
-                        <div id="kpi-subs"
-                             class="text-2xl font-black text-amber-600 mt-1">
-                            0
-                        </div>
-                    </div>
-
-
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">
-                            Flagged Incidents / Notes
-                        </div>
-
-                        <div id="kpi-notes"
-                             class="text-2xl font-black text-rose-600 mt-1">
-                            0
-                        </div>
-                    </div>
-
-                </div>
-
-
-                <!-- EXCEPTIONS -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-
-                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                            Missing Check-Ins
-                        </h3>
-
-                        <div id="missing-buses-list"
-                             class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto">
-                        </div>
-
-                    </div>
-
-
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-
-                        <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3">
-                            Late Arrivals
-                        </h3>
-
-                        <div id="late-buses-list"
-                             class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto">
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <!-- TOOLBAR -->
-                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-900">
-                            Submission Audit History Logs
-                        </h2>
-
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            Permanent, date-stamped records from the front-end logging workflow.
-                        </p>
-                    </div>
-
-
-                    <div class="flex items-center space-x-2">
-
-                        <button onclick="refreshCloudData()"
-                                class="bg-blue-600 text-white font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-sm touch-target">
-
-                            🔄 Force Sync Now
-
-                        </button>
-
-
-                        <button onclick="resetTodayView()"
-                                class="bg-slate-100 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-slate-200 transition-colors border border-slate-200 touch-target">
-
-                            Reset Today's View
-
-                        </button>
-
-                    </div>
-
-                </div>
-
-
-                <!-- AUDIT TABLE -->
-                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-
-                    <div class="overflow-x-auto no-scrollbar">
-
-                        <table class="w-full text-left border-collapse">
-
-                            <thead>
-
-                                <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-
-                                    <th class="p-4 font-semibold">
-                                        Date
-                                    </th>
-
-                                    <th class="p-4 font-semibold">
-                                        Logged At
-                                    </th>
-
-                                    <th class="p-4 font-semibold">
-                                        Route ID
-                                    </th>
-
-                                    <th class="p-4 font-semibold">
-                                        Assigned Fleet Bus
-                                    </th>
-
-                                    <th class="p-4 font-semibold">
-                                        Substitution Bus
-                                    </th>
-
-                                    <th class="p-4 font-semibold">
-                                        Recorded Arrival
-                                    </th>
-
-                                    <th class="p-4 font-semibold">
-                                        Contextual Operational Notes
-                                    </th>
-
-                                </tr>
-
-                            </thead>
-
-                            <tbody id="audit-table-body"
-                                   class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
-                            </tbody>
-
-                        </table>
-
-                    </div>
-
-
-                    <div id="table-empty-state"
-                         class="hidden text-center py-12 text-slate-400">
-
-                        <p class="text-sm font-semibold">
-                            No bus data has been submitted for this session yet.
-                        </p>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </section>
-
-    </main>
-
+        </div>
+    </section>
+</main>
 
 <script>
-
 const ADMIN_PIN = "5801";
-
-const GOOGLE_SCRIPT_URL =
-"https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec";
-
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec";
 
 const DEFAULT_ROUTES = [
-    "Bus 611",
-    "Bus 628",
-    "Bus 654",
-    "Bus 655",
-    "Bus 661",
-    "Bus 662",
-    "Bus 668",
-    "Bus 727",
-    "Bus 743",
-    "Bus 1058",
-    "Bus 1061",
-    "Bus 1072",
-    "Bus 1096",
-    "Bus 1107",
-    "Bus 1119",
-    "Bus 1121",
-    "Bus 1355",
-    "Bus 1379",
-    "Bus 1561"
+    "Bus 611", "Bus 628", "Bus 654", "Bus 655", "Bus 661",
+    "Bus 662", "Bus 668", "Bus 727", "Bus 743", "Bus 1058",
+    "Bus 1061", "Bus 1072", "Bus 1096", "Bus 1107", "Bus 1119",
+    "Bus 1121", "Bus 1355", "Bus 1379", "Bus 1561"
 ];
-
 
 let activeBuses = [...DEFAULT_ROUTES];
 let submissionsLog = [];
 
-
-/* ==========================================================
-   DATE FUNCTIONS
-========================================================== */
-
+// ---------------------------------------------------------
+// DATE + SESSION HELPERS
+// ---------------------------------------------------------
 function getTodayDateString() {
-
     const now = new Date();
-
-    const year = now.getFullYear();
-
-    const month =
-        String(now.getMonth() + 1).padStart(2, "0");
-
-    const day =
-        String(now.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+function normalizeDateKey(value) {
+    if (!value) return "";
+    const text = String(value).trim();
 
-function getTodaysSubmissions() {
+    // yyyy-mm-dd or ISO date
+    const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+        return `${isoMatch[1]}-${String(isoMatch[2]).padStart(2, "0")}-${String(isoMatch[3]).padStart(2, "0")}`;
+    }
 
+    // m/d/yyyy, optionally followed by time
+    const usMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (usMatch) {
+        return `${usMatch[3]}-${String(usMatch[1]).padStart(2, "0")}-${String(usMatch[2]).padStart(2, "0")}`;
+    }
+
+    const parsed = new Date(text);
+    if (!isNaN(parsed.getTime())) {
+        return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+    }
+
+    return "";
+}
+
+function getRecordDateKey(item) {
+    return normalizeDateKey(item.date) || normalizeDateKey(item.timestamp);
+}
+
+function getRecordEpoch(item) {
+    // Your Apps Script IDs use log_ + Date.now(), which is the most reliable timestamp.
+    if (item && typeof item.id === "string") {
+        const match = item.id.match(/^log_(\d{10,})$/);
+        if (match) {
+            const epoch = Number(match[1]);
+            if (Number.isFinite(epoch)) return epoch;
+        }
+    }
+
+    if (item && item.timestamp) {
+        const parsed = new Date(item.timestamp).getTime();
+        if (!isNaN(parsed)) return parsed;
+    }
+
+    return 0;
+}
+
+let sessionResetCutoff = 0;
+
+function getResetCutoff() {
+    return sessionResetCutoff;
+}
+
+function getCurrentSessionSubmissions() {
     const today = getTodayDateString();
+    const cutoff = getResetCutoff();
 
     return submissionsLog.filter(item => {
+        if (getRecordDateKey(item) !== today) return false;
+        if (!cutoff) return true;
 
-        if (!item.date) {
-            return false;
-        }
-
-        return item.date === today;
-
+        const epoch = getRecordEpoch(item);
+        // If a record has no usable timestamp/id, exclude it after a manual reset.
+        return epoch > cutoff;
     });
 }
 
-
-/* ==========================================================
-   PAGE INITIALIZATION
-========================================================== */
-
+// ---------------------------------------------------------
+// INITIALIZATION + GOOGLE SHEETS
+// ---------------------------------------------------------
 window.onload = function() {
-
     startLiveClock();
+    activeBuses = [...DEFAULT_ROUTES];
 
-    if (GOOGLE_SCRIPT_URL) {
-
-        refreshCloudData();
-
-        setInterval(refreshCloudData, 15000);
-
-    } else {
-
-        setupLocalStorageFallback();
-
-    }
-
-};
-
-
-/* ==========================================================
-   LOCAL STORAGE
-========================================================== */
-
-function setupLocalStorageFallback() {
-
-    if (localStorage.getItem("bus_submissions_db")) {
-
-        submissionsLog =
-            JSON.parse(
-                localStorage.getItem("bus_submissions_db")
-            );
-
-    }
-
-    if (localStorage.getItem("active_bus_routes")) {
-
-        activeBuses =
-            JSON.parse(
-                localStorage.getItem("active_bus_routes")
-            );
-
-    }
-
-    if (!activeBuses || activeBuses.length === 0) {
-
-        activeBuses = [...DEFAULT_ROUTES];
-
-    }
-
+    // Render the fixed fleet first. This does not depend on Google Sheets or storage.
     renderStaffLoggingPanel();
 
-    updatePrincipalDashboardUI();
+    try {
+        updatePrincipalDashboardUI();
+    } catch (error) {
+        console.error("Dashboard initialization error:", error);
+    }
 
-}
-
-
-/* ==========================================================
-   GOOGLE SHEETS COMMUNICATION
-========================================================== */
+    refreshCloudData();
+    setInterval(refreshCloudData, 15000);
+};
 
 function callGoogleScript(params, callback) {
-
-    const queryString =
-        new URLSearchParams(params).toString();
+    const queryString = new URLSearchParams(params).toString();
 
     fetch(`${GOOGLE_SCRIPT_URL}?${queryString}`)
-
-        .then(response => response.json())
-
-        .then(data => {
-
-            if (callback) {
-                callback(data);
-            }
-
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
         })
-
+        .then(data => {
+            if (callback) callback(data);
+        })
         .catch(error => {
-
-            console.error(
-                "Google Sheets Sync Error:",
-                error
-            );
-
-            showToastNotification(
-                "⚠️ Sheet Sync Error. Check web deployment permissions."
-            );
-
+            console.error("Google Sheets Sync Error:", error);
+            showToastNotification("⚠️ Google Sheet sync error. Existing routes remain available.");
         });
-
 }
 
+function applyCloudData(data) {
+    if (!data) return;
+
+    submissionsLog = Array.isArray(data.submissions) ? data.submissions : [];
+
+    // Always keep the 19 default buses visible; add any custom routes returned by Google Sheets.
+    const cloudRoutes = Array.isArray(data.routes) ? data.routes.filter(Boolean) : [];
+    activeBuses = [...new Set([...DEFAULT_ROUTES, ...cloudRoutes])];
+
+    renderStaffLoggingPanel();
+    updatePrincipalDashboardUI();
+}
 
 function refreshCloudData() {
-
-    callGoogleScript(
-        { action: "read" },
-        function(data) {
-
-            if (!data) return;
-
-
-            submissionsLog =
-                data.submissions || [];
-
-
-            /*
-             IMPORTANT:
-             If Google Sheets returns an empty Routes array,
-             do NOT erase the buses from the application.
-            */
-
-            if (
-                Array.isArray(data.routes) &&
-                data.routes.length > 0
-            ) {
-
-                activeBuses = data.routes;
-
-            } else {
-
-                activeBuses = [...DEFAULT_ROUTES];
-
-            }
-
-
-            renderStaffLoggingPanel();
-
-            updatePrincipalDashboardUI();
-
-        }
-    );
-
+    callGoogleScript({ action: "read" }, applyCloudData);
 }
 
-
-/* ==========================================================
-   CLOCK
-========================================================== */
-
+// ---------------------------------------------------------
+// CLOCK / NAV / TOAST
+// ---------------------------------------------------------
 function startLiveClock() {
-
     function updateClock() {
-
         const now = new Date();
-
-        const timeOptions = {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: true
-        };
-
-        const dateOptions = {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric"
-        };
-
-
-        document.getElementById("live-clock").innerText =
-            now.toLocaleTimeString(
-                "en-US",
-                timeOptions
-            );
-
-
-        document.getElementById("live-date").innerText =
-            now.toLocaleDateString(
-                "en-US",
-                dateOptions
-            );
-
+        document.getElementById("live-clock").innerText = now.toLocaleTimeString("en-US", {
+            hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true
+        });
+        document.getElementById("live-date").innerText = now.toLocaleDateString("en-US", {
+            weekday: "long", year: "numeric", month: "long", day: "numeric"
+        });
     }
-
     updateClock();
-
     setInterval(updateClock, 1000);
-
 }
 
+function switchTab(target) {
+    const logging = target === "logging";
+    document.getElementById("view-logging").classList.toggle("hidden", !logging);
+    document.getElementById("view-review").classList.toggle("hidden", logging);
 
-/* ==========================================================
-   TAB SWITCHING
-========================================================== */
+    document.getElementById("tab-logging").className = logging
+        ? "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target"
+        : "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target";
 
-function switchTab(viewTarget) {
-
-    const loggingTab =
-        document.getElementById("tab-logging");
-
-    const reviewTab =
-        document.getElementById("tab-review");
-
-    const loggingView =
-        document.getElementById("view-logging");
-
-    const reviewView =
-        document.getElementById("view-review");
-
-
-    if (viewTarget === "logging") {
-
-        loggingTab.className =
-            "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target";
-
-        reviewTab.className =
-            "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 touch-target";
-
-        loggingView.classList.remove("hidden");
-
-        reviewView.classList.add("hidden");
-
-    } else {
-
-        reviewTab.className =
-            "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target";
-
-        loggingTab.className =
-            "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 touch-target";
-
-        loggingView.classList.add("hidden");
-
-        reviewView.classList.remove("hidden");
-
-    }
-
+    document.getElementById("tab-review").className = !logging
+        ? "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target"
+        : "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target";
 }
 
-
-/* ==========================================================
-   TOAST
-========================================================== */
-
-function showToastNotification(textMessage) {
-
-    const toast =
-        document.getElementById("notification-toast");
-
-    const message =
-        document.getElementById("toast-message");
-
-
-    message.innerText = textMessage;
-
+let toastTimer;
+function showToastNotification(message) {
+    const toast = document.getElementById("notification-toast");
+    document.getElementById("toast-message").innerText = message;
     toast.classList.remove("hidden");
-
-    setTimeout(() => {
-
-        toast.classList.remove(
-            "translate-y-10",
-            "opacity-0"
-        );
-
-    }, 50);
-
-
-    setTimeout(() => {
-
-        toast.classList.add(
-            "translate-y-10",
-            "opacity-0"
-        );
-
-        setTimeout(() => {
-
-            toast.classList.add("hidden");
-
-        }, 300);
-
-    }, 3000);
-
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.add("hidden"), 3000);
 }
 
-
-/* ==========================================================
-   STAFF BUS CARDS
-========================================================== */
-
+// ---------------------------------------------------------
+// STAFF SCREEN
+// ---------------------------------------------------------
 function renderStaffLoggingPanel() {
-
-    const container =
-        document.getElementById("bus-cards-container");
-
+    const container = document.getElementById("bus-cards-container");
     if (!container) return;
-
-
     container.innerHTML = "";
 
+    let currentSession = [];
+    try {
+        currentSession = getCurrentSessionSubmissions();
+    } catch (error) {
+        console.error("Session filtering error:", error);
+        currentSession = [];
+    }
 
-    activeBuses.forEach((busRoute, idx) => {
+    const routesToRender = [...new Set([...DEFAULT_ROUTES, ...(Array.isArray(activeBuses) ? activeBuses : [])])];
 
-        const todaysSubmissions =
-            getTodaysSubmissions();
+    routesToRender.forEach((busRoute, idx) => {
+        const currentSubmission = currentSession.find(item => item.routeId === busRoute);
+        const card = document.createElement("div");
 
+        card.className = `p-5 rounded-2xl border transition-all duration-200 bg-white ${
+            currentSubmission
+                ? "border-emerald-300 ring-2 ring-emerald-500/20 shadow-sm"
+                : "border-slate-200 hover:border-slate-300 shadow-sm"
+        }`;
 
-        const currentSubmission =
-            todaysSubmissions.find(
-                item => item.routeId === busRoute
-            );
-
-
-        const card =
-            document.createElement("div");
-
-
-        card.className =
-            `p-5 rounded-2xl border transition-all duration-200 bg-white ${
-                currentSubmission
-                ? "border-emerald-200 ring-2 ring-emerald-500/10 shadow-sm"
-                : "border-slate-200 shadow-sm"
-            }`;
-
-
-        let cardBodyMarkup = `
-
+        let html = `
             <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-
                 <div class="flex items-center space-x-2">
-
-                    <span class="w-2.5 h-2.5 rounded-full ${
-                        currentSubmission
-                        ? "bg-emerald-500 animate-pulse"
-                        : "bg-amber-400"
-                    }"></span>
-
-                    <h3 class="text-base font-bold text-slate-900">
-                        ${busRoute}
-                    </h3>
-
+                    <span class="w-2.5 h-2.5 rounded-full ${currentSubmission ? "bg-emerald-500" : "bg-amber-400"}"></span>
+                    <h3 class="text-base font-bold ${currentSubmission ? "text-emerald-700" : "text-slate-900"}">${escapeHtml(busRoute)}</h3>
                 </div>
-
-                ${
-                    currentSubmission
-                    ? `<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">
-                        Logged
-                       </span>`
-                    : `<span class="bg-slate-50 border border-slate-200 text-slate-500 text-xs font-bold px-2.5 py-1 rounded-full">
-                        Pending
-                       </span>`
-                }
-
-            </div>
-
-        `;
-
+                ${currentSubmission
+                    ? '<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Logged</span>'
+                    : '<span class="bg-slate-50 border border-slate-200 text-slate-500 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Pending</span>'}
+            </div>`;
 
         if (currentSubmission) {
-
-            cardBodyMarkup += `
-
-                <div class="space-y-2 mb-4 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-100 p-3 rounded-xl">
-
-                    <div class="flex justify-between">
-
-                        <span>Arrival Time:</span>
-
-                        <span class="text-emerald-800 font-bold">
-                            ${currentSubmission.arrivalTime}
-                        </span>
-
-                    </div>
-
-
-                    <div class="flex justify-between">
-
-                        <span>Substitution:</span>
-
-                        <span class="text-slate-900 font-bold">
-                            ${currentSubmission.substitution || "None"}
-                        </span>
-
-                    </div>
-
-
-                    <div class="pt-1.5 border-t border-slate-200/60">
-
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                            Notes:
-                        </span>
-
-                        <p class="text-slate-800 mt-0.5 italic">
-                            "${currentSubmission.notes || "No notes"}"
-                        </p>
-
-                    </div>
-
+            html += `
+                <div class="space-y-2 mb-4 text-xs font-semibold text-slate-600 bg-emerald-50/40 border border-emerald-100 p-3 rounded-xl">
+                    <div class="flex justify-between"><span>Arrival Time:</span><span class="text-emerald-800 font-bold">${escapeHtml(currentSubmission.arrivalTime || "")}</span></div>
+                    <div class="flex justify-between"><span>Substitution:</span><span class="text-slate-900 font-bold">${escapeHtml(currentSubmission.substitution || "None")}</span></div>
+                    <div class="pt-1.5 border-t border-emerald-100"><span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes:</span><p class="text-slate-800 mt-0.5 italic">${escapeHtml(currentSubmission.notes || "N/A")}</p></div>
                 </div>
-
-
-                <button onclick="undoSubmission('${busRoute}')"
-                        class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-xs py-2.5 rounded-xl touch-target">
-
-                    Edit Submission Record
-
-                </button>
-
-            `;
-
+                <button onclick="undoSubmission('${escapeJs(busRoute)}')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-xs py-2.5 rounded-xl touch-target">Edit Submission Record</button>`;
         } else {
-
-            cardBodyMarkup += `
-
+            html += `
                 <div class="space-y-3 mb-4">
-
                     <div>
-
-                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                            Arrival Timestamp
-                        </label>
-
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Arrival Timestamp</label>
                         <div class="flex space-x-2">
-
-                            <input type="time"
-                                   id="time-${idx}"
-                                   class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm touch-target font-semibold">
-
-                            <button onclick="stampCurrentTime(${idx})"
-                                    class="bg-slate-900 text-white font-bold text-xs px-3 rounded-xl touch-target">
-
-                                ⏱ Now
-
-                            </button>
-
+                            <input type="time" id="time-${idx}" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-semibold">
+                            <button onclick="stampCurrentTime(${idx})" class="bg-slate-900 text-white font-bold text-xs px-3 rounded-xl hover:bg-slate-800 touch-target whitespace-nowrap">⏱ Now</button>
                         </div>
-
                     </div>
-
-
                     <div>
-
-                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                            Fleet Sub Bus # (Optional)
-                        </label>
-
-                        <input type="text"
-                               id="sub-${idx}"
-                               placeholder="e.g. Bus 42-B"
-                               class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm touch-target font-medium">
-
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Fleet Sub Bus # (Optional)</label>
+                        <input type="text" id="sub-${idx}" placeholder="e.g. Bus 42-B" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-medium">
                     </div>
-
-
                     <div>
-
-                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                            Operational Notes / Comments
-                        </label>
-
-                        <textarea id="notes-${idx}"
-                                  rows="2"
-                                  placeholder="Delay details, parent complaints, etc."
-                                  class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium"></textarea>
-
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Operational Notes / Comments</label>
+                        <textarea id="notes-${idx}" rows="2" placeholder="Delay details, parent complaints, etc." class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"></textarea>
                     </div>
-
                 </div>
-
-
-                <button onclick="submitBusRecord('${busRoute}', ${idx})"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl touch-target">
-
-                    ✔ Log Arrival Data
-
-                </button>
-
-            `;
-
+                <button onclick="submitBusRecord('${escapeJs(busRoute)}', ${idx})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl shadow-md touch-target">✔ Log Arrival Data</button>`;
         }
 
-
-        card.innerHTML = cardBodyMarkup;
-
+        card.innerHTML = html;
         container.appendChild(card);
-
     });
-
 }
 
+function stampCurrentTime(idx) {
+    const field = document.getElementById(`time-${idx}`);
+    if (!field) return;
+    const now = new Date();
+    field.value = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
 
-/* ==========================================================
-   CURRENT TIME
-========================================================== */
-
-function stampCurrentTime(cardIndex) {
-
-    const timeField =
-        document.getElementById(`time-${cardIndex}`);
-
+function submitBusRecord(routeId, idx) {
+    const timeField = document.getElementById(`time-${idx}`);
+    const subField = document.getElementById(`sub-${idx}`);
+    const notesField = document.getElementById(`notes-${idx}`);
     if (!timeField) return;
 
-
-    const now = new Date();
-
-    const hours =
-        String(now.getHours()).padStart(2, "0");
-
-    const minutes =
-        String(now.getMinutes()).padStart(2, "0");
-
-
-    timeField.value =
-        `${hours}:${minutes}`;
-
-}
-
-
-/* ==========================================================
-   SUBMIT
-========================================================== */
-
-function submitBusRecord(routeId, index) {
-
-    const timeValue =
-        document.getElementById(`time-${index}`).value;
-
-    const subValue =
-        document.getElementById(`sub-${index}`).value.trim();
-
-    const notesValue =
-        document.getElementById(`notes-${index}`).value.trim();
-
-
+    const timeValue = timeField.value;
     if (!timeValue) {
-
-        showToastNotification(
-            "⚠️ Please specify an arrival time."
-        );
-
+        showToastNotification("⚠️ Please specify an arrival time before submitting.");
         return;
-
     }
 
+    showToastNotification("Saving directly to Google Sheets...");
 
-    const arrivalText =
-        formatTime12H(timeValue);
-
-
-    if (GOOGLE_SCRIPT_URL) {
-
-        showToastNotification(
-            "Saving directly to Google Sheets..."
-        );
-
-
-        callGoogleScript(
-            {
-                action: "submit",
-                routeId: routeId,
-                arrivalTime: arrivalText,
-                rawTime: timeValue,
-                substitution: subValue || "None",
-                notes: notesValue || "N/A"
-            },
-
-            function(data) {
-
-                if (data) {
-
-                    submissionsLog =
-                        data.submissions || [];
-
-
-                    if (
-                        Array.isArray(data.routes) &&
-                        data.routes.length > 0
-                    ) {
-
-                        activeBuses =
-                            data.routes;
-
-                    } else {
-
-                        activeBuses =
-                            [...DEFAULT_ROUTES];
-
-                    }
-
-
-                    renderStaffLoggingPanel();
-
-                    updatePrincipalDashboardUI();
-
-
-                    showToastNotification(
-                        `Successfully logged ${routeId} to Google Sheet!`
-                    );
-
-                }
-
-            }
-        );
-
-    }
-
+    callGoogleScript({
+        action: "submit",
+        routeId,
+        arrivalTime: formatTime12H(timeValue),
+        rawTime: timeValue,
+        substitution: subField && subField.value.trim() ? subField.value.trim() : "None",
+        notes: notesField && notesField.value.trim() ? notesField.value.trim() : "N/A"
+    }, function(data) {
+        applyCloudData(data);
+        showToastNotification(`Successfully logged ${routeId} to Google Sheet!`);
+    });
 }
-
-
-/* ==========================================================
-   UNDO
-========================================================== */
 
 function undoSubmission(routeId) {
-
-    if (!GOOGLE_SCRIPT_URL) return;
-
-
-    showToastNotification(
-        "Reopening row entry..."
-    );
-
-
-    callGoogleScript(
-        {
-            action: "undo",
-            routeId: routeId
-        },
-
-        function(data) {
-
-            if (data) {
-
-                submissionsLog =
-                    data.submissions || [];
-
-
-                activeBuses =
-                    data.routes &&
-                    data.routes.length
-                    ? data.routes
-                    : [...DEFAULT_ROUTES];
-
-
-                renderStaffLoggingPanel();
-
-                updatePrincipalDashboardUI();
-
-
-                showToastNotification(
-                    "Record reopened."
-                );
-
-            }
-
-        }
-    );
-
+    showToastNotification("Reopening today's row entry...");
+    callGoogleScript({ action: "undo", routeId }, function(data) {
+        applyCloudData(data);
+        showToastNotification("Record reopened.");
+    });
 }
-
-
-/* ==========================================================
-   ADD CUSTOM BUS
-========================================================== */
 
 function addCustomBus() {
-
-    const inputField =
-        document.getElementById("new-bus-number");
-
-    const newRouteName =
-        inputField.value.trim();
-
-
-    if (!newRouteName) return;
-
-
-    if (activeBuses.includes(newRouteName)) {
-
-        showToastNotification(
-            "⚠️ This route ID is already registered."
-        );
-
+    const input = document.getElementById("new-bus-number");
+    const route = input.value.trim();
+    if (!route) return;
+    if (activeBuses.includes(route)) {
+        showToastNotification("⚠️ This route ID is already registered.");
         return;
-
     }
 
-
-    callGoogleScript(
-        {
-            action: "addRoute",
-            routeId: newRouteName
-        },
-
-        function(data) {
-
-            if (data) {
-
-                activeBuses =
-                    data.routes &&
-                    data.routes.length
-                    ? data.routes
-                    : [...DEFAULT_ROUTES];
-
-
-                renderStaffLoggingPanel();
-
-                updatePrincipalDashboardUI();
-
-
-                showToastNotification(
-                    `Route "${newRouteName}" added.`
-                );
-
-            }
-
+    callGoogleScript({ action: "addRoute", routeId: route }, function(data) {
+        if (data && Array.isArray(data.routes) && data.routes.length > 0) {
+            activeBuses = data.routes;
+        } else {
+            activeBuses.push(route);
         }
-    );
-
-
-    inputField.value = "";
-
-}
-
-
-/* ==========================================================
-   ADMIN LOGIN
-========================================================== */
-
-function verifyAdminAccess() {
-
-    const pinValue =
-        document.getElementById("admin-pin").value;
-
-    const errorText =
-        document.getElementById("auth-error");
-
-    const authWall =
-        document.getElementById("principal-auth-wall");
-
-    const dashboardContent =
-        document.getElementById("principal-dashboard-content");
-
-
-    if (pinValue === ADMIN_PIN) {
-
-        errorText.className = "hidden";
-
-        authWall.className = "hidden";
-
-        dashboardContent.className =
-            "space-y-6";
-
+        submissionsLog = data && Array.isArray(data.submissions) ? data.submissions : submissionsLog;
+        renderStaffLoggingPanel();
         updatePrincipalDashboardUI();
+        showToastNotification(`Route "${route}" added.`);
+    });
+    input.value = "";
+}
 
-
-        showToastNotification(
-            "🔒 Access Granted."
-        );
-
+// ---------------------------------------------------------
+// ADMIN / DASHBOARD
+// ---------------------------------------------------------
+function verifyAdminAccess() {
+    const pin = document.getElementById("admin-pin").value;
+    if (pin === ADMIN_PIN) {
+        document.getElementById("auth-error").classList.add("hidden");
+        document.getElementById("principal-auth-wall").classList.add("hidden");
+        document.getElementById("principal-dashboard-content").classList.remove("hidden");
+        updatePrincipalDashboardUI();
+        showToastNotification("🔒 Access Granted. Live spreadsheet data loaded.");
     } else {
-
-        errorText.classList.remove("hidden");
-
+        document.getElementById("auth-error").classList.remove("hidden");
         document.getElementById("admin-pin").value = "";
-
     }
-
 }
-
-
-/* ==========================================================
-   RESET TODAY'S VIEW
-========================================================== */
-
-function resetTodayView() {
-
-    if (
-        confirm(
-            "Refresh today's app view? Historical Google Sheet records will NOT be deleted."
-        )
-    ) {
-
-        refreshCloudData();
-
-        showToastNotification(
-            "Today's app view has been refreshed. Historical records are safe."
-        );
-
-    }
-
-}
-
-
-/* ==========================================================
-   PRINCIPAL DASHBOARD
-========================================================== */
 
 function updatePrincipalDashboardUI() {
+    const currentSession = getCurrentSessionSubmissions();
+    const loggedRouteIds = currentSession.map(item => item.routeId);
+    const missingBuses = activeBuses.filter(bus => !loggedRouteIds.includes(bus));
+    const lateArrivals = currentSession.filter(item => item.rawTime && item.rawTime > "09:25");
+    const onTimeCount = currentSession.length - lateArrivals.length;
 
-    const tableBody =
-        document.getElementById("audit-table-body");
+    document.getElementById("kpi-total").innerText = currentSession.length;
+    document.getElementById("kpi-ontime").innerText = onTimeCount;
+    document.getElementById("kpi-subs").innerText = currentSession.filter(item => item.substitution && item.substitution !== "None").length;
+    document.getElementById("kpi-notes").innerText = currentSession.filter(item => item.notes && item.notes !== "N/A").length;
 
-    const emptyState =
-        document.getElementById("table-empty-state");
-
-    const missingContainer =
-        document.getElementById("missing-buses-list");
-
-    const lateContainer =
-        document.getElementById("late-buses-list");
-
-
-    const todaysSubmissions =
-        getTodaysSubmissions();
-
-
-    const loggedRouteIds =
-        todaysSubmissions.map(
-            item => item.routeId
-        );
-
-
-    const missingBuses =
-        activeBuses.filter(
-            bus => !loggedRouteIds.includes(bus)
-        );
-
-
-    const lateArrivals =
-        todaysSubmissions.filter(
-            item =>
-                item.rawTime &&
-                item.rawTime > "09:25"
-        );
-
-
-    const onTimeCount =
-        todaysSubmissions.length -
-        lateArrivals.length;
-
-
-    document.getElementById("kpi-total").innerText =
-        todaysSubmissions.length;
-
-
-    document.getElementById("kpi-ontime").innerText =
-        onTimeCount;
-
-
-    document.getElementById("kpi-subs").innerText =
-        todaysSubmissions.filter(
-            item =>
-                item.substitution &&
-                item.substitution !== "None"
-        ).length;
-
-
-    document.getElementById("kpi-notes").innerText =
-        todaysSubmissions.filter(
-            item =>
-                item.notes &&
-                item.notes !== "N/A"
-        ).length;
-
-
-    /* MISSING BUSES */
-
+    const missingContainer = document.getElementById("missing-buses-list");
     missingContainer.innerHTML = "";
-
-
     if (missingBuses.length === 0) {
-
-        missingContainer.innerHTML =
-            `<span class="text-xs text-emerald-600 font-medium italic">
-                All units accounted for.
-             </span>`;
-
+        missingContainer.innerHTML = '<span class="text-xs text-emerald-600 font-medium italic py-1">All units accounted for.</span>';
     } else {
-
         missingBuses.forEach(bus => {
-
-            const badge =
-                document.createElement("span");
-
-            badge.className =
-                "bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
-
+            const badge = document.createElement("span");
+            badge.className = "bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
             badge.innerText = bus;
-
             missingContainer.appendChild(badge);
-
         });
-
     }
 
-
-    /* LATE BUSES */
-
+    const lateContainer = document.getElementById("late-buses-list");
     lateContainer.innerHTML = "";
-
-
     if (lateArrivals.length === 0) {
-
-        lateContainer.innerHTML =
-            `<span class="text-xs text-emerald-600 font-medium italic">
-                Zero late exceptions recorded today.
-             </span>`;
-
+        lateContainer.innerHTML = '<span class="text-xs text-emerald-600 font-medium italic py-1">Zero late exceptions recorded in this session.</span>';
     } else {
-
         lateArrivals.forEach(log => {
-
-            const badge =
-                document.createElement("span");
-
-            badge.className =
-                "bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs px-2.5 py-1 rounded-xl";
-
-            badge.innerHTML =
-                `<span>${log.routeId}</span>
-                 <span class="ml-2">${log.arrivalTime}</span>`;
-
+            const badge = document.createElement("span");
+            badge.className = "bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
+            badge.innerText = `${log.routeId} — ${log.arrivalTime}`;
             lateContainer.appendChild(badge);
-
         });
-
     }
 
-
-    /* AUDIT TABLE */
-
+    // Audit table intentionally uses ALL submissions so Google Sheet history remains visible.
+    const tableBody = document.getElementById("audit-table-body");
+    const emptyState = document.getElementById("table-empty-state");
     tableBody.innerHTML = "";
 
-
-    if (submissionsLog.length === 0) {
-
+    if (!submissionsLog.length) {
         emptyState.classList.remove("hidden");
-
         return;
-
     }
-
 
     emptyState.classList.add("hidden");
 
-
-    const sortedLogs =
-        [...submissionsLog].reverse();
-
-
-    sortedLogs.forEach(log => {
-
-        const isLate =
-            log.rawTime &&
-            log.rawTime > "09:25";
-
-
-        const row =
-            document.createElement("tr");
-
-
-        row.className =
-            "transition-colors border-b border-slate-100 hover:bg-slate-50";
-
-
+    [...submissionsLog].reverse().forEach(log => {
+        const row = document.createElement("tr");
+        const isLate = log.rawTime && log.rawTime > "09:25";
+        row.className = `transition-colors border-b border-slate-100 ${isLate ? "bg-rose-50/20" : "hover:bg-slate-50"}`;
         row.innerHTML = `
-
-            <td class="p-4 text-xs font-semibold text-slate-500 tabular-nums">
-                ${formatDisplayDate(log.date)}
-            </td>
-
-            <td class="p-4 text-xs font-semibold text-slate-400 tabular-nums">
-                ${log.timestamp || "Synced"}
-            </td>
-
-            <td class="p-4 font-bold text-slate-900">
-                ${log.routeId}
-            </td>
-
-            <td class="p-4 text-slate-500 font-medium">
-                Standard Bus Fleet
-            </td>
-
-            <td class="p-4">
-                ${log.substitution || "None"}
-            </td>
-
-            <td class="p-4 font-bold tabular-nums ${
-                isLate
-                ? "text-rose-600"
-                : "text-blue-600"
-            }">
-
-                ${log.arrivalTime}
-
-            </td>
-
-            <td class="p-4 text-xs max-w-xs truncate text-slate-600"
-                title="${log.notes || ""}">
-
-                ${log.notes || "N/A"}
-
-            </td>
-
-        `;
-
-
+            <td class="p-4 text-xs font-semibold text-slate-500 tabular-nums">${escapeHtml(formatDisplayDate(getRecordDateKey(log)))}</td>
+            <td class="p-4 text-xs font-semibold text-slate-400 tabular-nums">${escapeHtml(log.timestamp || "Synced")}</td>
+            <td class="p-4 font-bold text-slate-900">${escapeHtml(log.routeId || "")}</td>
+            <td class="p-4 text-slate-500 font-medium">Standard Bus Fleet</td>
+            <td class="p-4">${escapeHtml(log.substitution || "None")}</td>
+            <td class="p-4 font-bold tabular-nums ${isLate ? "text-rose-600" : "text-blue-600"}">${escapeHtml(log.arrivalTime || "")}</td>
+            <td class="p-4 text-xs text-slate-600">${escapeHtml(log.notes || "N/A")}</td>`;
         tableBody.appendChild(row);
-
     });
-
 }
 
-
-/* ==========================================================
-   DATE DISPLAY
-========================================================== */
-
-function formatDisplayDate(dateString) {
-
-    if (!dateString) {
-        return "—";
-    }
-
-
-    const parts =
-        dateString.split("-");
-
-
-    if (parts.length !== 3) {
-        return dateString;
-    }
-
-
-    return `${parts[1]}/${parts[2]}/${parts[0]}`;
-
-}
-
-
-/* ==========================================================
-   LOCAL STORAGE
-========================================================== */
-
-function saveDataStateToStorage() {
-
-    localStorage.setItem(
-        "bus_submissions_db",
-        JSON.stringify(submissionsLog)
+// ---------------------------------------------------------
+// RESET: LOCAL SESSION ONLY — NEVER DELETES GOOGLE SHEETS
+// ---------------------------------------------------------
+function resetTodayView() {
+    const confirmed = confirm(
+        "Start a fresh app session for today?\n\nAll historical records will remain in Google Sheets and in the audit history. The staff screen and today's counters will reset to Pending/0."
     );
+    if (!confirmed) return;
 
-
-    localStorage.setItem(
-        "active_bus_routes",
-        JSON.stringify(activeBuses)
-    );
-
+    sessionResetCutoff = Date.now();
+    renderStaffLoggingPanel();
+    updatePrincipalDashboardUI();
+    showToastNotification("Today's app session reset. Google Sheet history was not changed.");
 }
 
-
-/* ==========================================================
-   CLEAR DATABASE
-========================================================== */
-
-function clearDatabase() {
-
-    if (
-        !confirm(
-            "Are you certain you want to purge all historical data submissions? This cannot be undone."
-        )
-    ) {
-
-        return;
-
-    }
-
-
-    callGoogleScript(
-        { action: "clear" },
-
-        function(data) {
-
-            if (data) {
-
-                submissionsLog =
-                    data.submissions || [];
-
-
-                activeBuses =
-                    data.routes &&
-                    data.routes.length
-                    ? data.routes
-                    : [...DEFAULT_ROUTES];
-
-
-                renderStaffLoggingPanel();
-
-                updatePrincipalDashboardUI();
-
-
-                showToastNotification(
-                    "Google Sheet reset successfully."
-                );
-
-            }
-
-        }
-    );
-
+// ---------------------------------------------------------
+// HELPERS
+// ---------------------------------------------------------
+function formatTime12H(value) {
+    if (!value) return "";
+    const [h, m] = value.split(":");
+    const hh = parseInt(h, 10);
+    return `${((hh + 11) % 12) + 1}:${m} ${hh >= 12 ? "PM" : "AM"}`;
 }
 
-
-/* ==========================================================
-   TIME FORMATTER
-========================================================== */
-
-function formatTime12H(timeString) {
-
-    if (!timeString) return "";
-
-
-    const [hours, minutes] =
-        timeString.split(":");
-
-
-    const hh =
-        parseInt(hours, 10);
-
-
-    const suffix =
-        hh >= 12 ? "PM" : "AM";
-
-
-    const formattedHours =
-        ((hh + 11) % 12) + 1;
-
-
-    return `${formattedHours}:${minutes} ${suffix}`;
-
+function formatDisplayDate(dateKey) {
+    if (!dateKey) return "—";
+    const parts = dateKey.split("-");
+    if (parts.length !== 3) return dateKey;
+    return `${Number(parts[1])}/${Number(parts[2])}/${parts[0]}`;
 }
 
+function escapeHtml(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function escapeJs(value) {
+    return String(value == null ? "" : value)
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'");
+}
 </script>
-
 </body>
 </html>
