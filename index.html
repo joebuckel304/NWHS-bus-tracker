@@ -151,6 +151,9 @@ const DEFAULT_ROUTES = [
 
 let activeBuses = [...DEFAULT_ROUTES];
 let submissionsLog = [];
+const SESSION_RESET_KEY = "bussync_session_reset_cutoff";
+const LOCAL_PENDING_KEY = "bussync_pending_submissions";
+let pendingLocalSubmissions = [];
 
 // ---------------------------------------------------------
 // DATE + SESSION HELPERS
@@ -252,7 +255,14 @@ function normalizeSubmissionRecord(item) {
     return item;
 }
 
-let sessionResetCutoff = 0;
+let sessionResetCutoff = Number(localStorage.getItem(SESSION_RESET_KEY) || 0);
+
+try {
+    pendingLocalSubmissions = JSON.parse(localStorage.getItem(LOCAL_PENDING_KEY) || "[]");
+    if (!Array.isArray(pendingLocalSubmissions)) pendingLocalSubmissions = [];
+} catch (error) {
+    pendingLocalSubmissions = [];
+}
 
 function getResetCutoff() {
     return sessionResetCutoff;
@@ -262,14 +272,20 @@ function getCurrentSessionSubmissions() {
     const today = getTodayDateString();
     const cutoff = getResetCutoff();
 
-    return submissionsLog.filter(item => {
-        if (getRecordDateKey(item) !== today) return false;
-        if (!cutoff) return true;
+    const combined = [...submissionsLog, ...pendingLocalSubmissions]
+        .map(normalizeSubmissionRecord)
+        .filter(item => item && getRecordDateKey(item) === today)
+        .filter(item => {
+            if (!cutoff) return true;
+            const epoch = getRecordEpoch(item);
+            return epoch > cutoff;
+        })
+        .sort((a, b) => getRecordEpoch(a) - getRecordEpoch(b));
 
-        const epoch = getRecordEpoch(item);
-        // If a record has no usable timestamp/id, exclude it after a manual reset.
-        return epoch > cutoff;
-    });
+    // Only the newest record for each route counts in the active app session.
+    const latestByRoute = new Map();
+    combined.forEach(item => latestByRoute.set(item.routeId, item));
+    return [...latestByRoute.values()];
 }
 
 // ---------------------------------------------------------
@@ -312,17 +328,34 @@ function callGoogleScript(params, callback) {
 function applyCloudData(data) {
     if (!data) return;
 
-    const incomingSubmissions = Array.isArray(data.submissions)
-        ? data.submissions
-        : (Array.isArray(data.currentSubmissions) ? data.currentSubmissions : []);
+    const hasSubmissionArray = Array.isArray(data.submissions) || Array.isArray(data.currentSubmissions);
+    if (hasSubmissionArray) {
+        const incomingSubmissions = Array.isArray(data.submissions)
+            ? data.submissions
+            : data.currentSubmissions;
 
-    submissionsLog = incomingSubmissions
-        .map(normalizeSubmissionRecord)
-        .filter(item => item && (item.id || item.routeId));
+        submissionsLog = incomingSubmissions
+            .map(normalizeSubmissionRecord)
+            .filter(item => item && (item.id || item.routeId));
 
-    // Always keep the 19 default buses visible; add any custom routes returned by Google Sheets.
-    const cloudRoutes = Array.isArray(data.routes) ? data.routes.filter(Boolean) : [];
-    activeBuses = [...new Set([...DEFAULT_ROUTES, ...cloudRoutes])];
+        // Remove optimistic local records once the same route/time is visible from Google Sheets.
+        pendingLocalSubmissions = pendingLocalSubmissions.filter(localItem => {
+            return !submissionsLog.some(cloudItem =>
+                cloudItem.routeId === localItem.routeId &&
+                (cloudItem.rawTime === localItem.rawTime || cloudItem.arrivalTime === localItem.arrivalTime) &&
+                getRecordDateKey(cloudItem) === getRecordDateKey(localItem)
+            );
+        });
+        localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(pendingLocalSubmissions));
+    }
+
+    // Never remove the fixed 19-bus fleet merely because a cloud response omitted routes.
+    if (Array.isArray(data.routes)) {
+        const cloudRoutes = data.routes.filter(Boolean);
+        activeBuses = [...new Set([...DEFAULT_ROUTES, ...cloudRoutes])];
+    } else {
+        activeBuses = [...new Set([...DEFAULT_ROUTES, ...activeBuses])];
+    }
 
     renderStaffLoggingPanel();
     updatePrincipalDashboardUI();
@@ -396,7 +429,7 @@ function renderStaffLoggingPanel() {
 
         card.className = `p-5 rounded-2xl border transition-all duration-200 bg-white ${
             currentSubmission
-                ? "border-emerald-300 ring-2 ring-emerald-500/20 shadow-sm"
+                ? "bg-emerald-50 border-emerald-400 ring-2 ring-emerald-500/20 shadow-sm"
                 : "border-slate-200 hover:border-slate-300 shadow-sm"
         }`;
 
@@ -407,7 +440,7 @@ function renderStaffLoggingPanel() {
                     <h3 class="text-base font-bold ${currentSubmission ? "text-emerald-700" : "text-slate-900"}">${escapeHtml(busRoute)}</h3>
                 </div>
                 ${currentSubmission
-                    ? '<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Logged</span>'
+                    ? '<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Arrived</span>'
                     : '<span class="bg-slate-50 border border-slate-200 text-slate-500 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Pending</span>'}
             </div>`;
 
@@ -465,17 +498,37 @@ function submitBusRecord(routeId, idx) {
         return;
     }
 
-    showToastNotification("Saving directly to Google Sheets...");
-
-    callGoogleScript({
-        action: "submit",
+    const now = new Date();
+    const optimisticRecord = {
+        id: `log_${Date.now()}`,
+        date: getTodayDateString(),
+        timestamp: now.toLocaleString("en-US"),
         routeId,
         arrivalTime: formatTime12H(timeValue),
         rawTime: timeValue,
         substitution: subField && subField.value.trim() ? subField.value.trim() : "None",
         notes: notesField && notesField.value.trim() ? notesField.value.trim() : "N/A"
+    };
+
+    // Update the staff card and principal dashboard immediately.
+    pendingLocalSubmissions = pendingLocalSubmissions.filter(item => item.routeId !== routeId);
+    pendingLocalSubmissions.push(optimisticRecord);
+    localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(pendingLocalSubmissions));
+    renderStaffLoggingPanel();
+    updatePrincipalDashboardUI();
+    showToastNotification(`${routeId} marked Arrived. Saving to Google Sheets...`);
+
+    callGoogleScript({
+        action: "submit",
+        routeId,
+        arrivalTime: optimisticRecord.arrivalTime,
+        rawTime: optimisticRecord.rawTime,
+        substitution: optimisticRecord.substitution,
+        notes: optimisticRecord.notes
     }, function(data) {
         applyCloudData(data);
+        // Re-read the Sheet so dashboards across multiple devices receive the saved row.
+        setTimeout(refreshCloudData, 750);
         showToastNotification(`Successfully logged ${routeId} to Google Sheet!`);
     });
 }
@@ -603,6 +656,9 @@ function resetTodayView() {
     if (!confirmed) return;
 
     sessionResetCutoff = Date.now();
+    localStorage.setItem(SESSION_RESET_KEY, String(sessionResetCutoff));
+    pendingLocalSubmissions = [];
+    localStorage.removeItem(LOCAL_PENDING_KEY);
     renderStaffLoggingPanel();
     updatePrincipalDashboardUI();
     showToastNotification("Today's app session reset. Google Sheet history was not changed.");
