@@ -106,11 +106,20 @@
             <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">App Session Controls</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Arrival history remains permanently stored in Google Sheets. Reset only starts a fresh app session.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Google Sheet records are retained permanently. Reset only starts a new app session.</p>
                 </div>
                 <div class="flex items-center space-x-2">
                     <button onclick="resetTodayView()" class="bg-slate-100 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-slate-200 transition-colors border border-slate-200 touch-target">Reset Today's View</button>
                 </div>
+            </div>
+
+            <!-- Hidden audit elements retained so the existing dashboard JavaScript can continue
+                 updating safely without rendering the audit log in the Principal Portal. -->
+            <div class="hidden" aria-hidden="true">
+                <table>
+                    <tbody id="audit-table-body"></tbody>
+                </table>
+                <div id="table-empty-state" class="hidden"></div>
             </div>
         </div>
     </section>
@@ -652,12 +661,40 @@ function updatePrincipalDashboardUI() {
         });
     }
 
+    // Audit table intentionally uses ALL submissions so Google Sheet history remains visible.
+    const tableBody = document.getElementById("audit-table-body");
+    const emptyState = document.getElementById("table-empty-state");
+    tableBody.innerHTML = "";
+
+    if (!submissionsLog.length) {
+        emptyState.classList.remove("hidden");
+        return;
+    }
+
+    emptyState.classList.add("hidden");
+
+    [...submissionsLog].reverse().forEach(log => {
+        const row = document.createElement("tr");
+        const isLate = log.rawTime && log.rawTime > "09:25";
+        row.className = `transition-colors border-b border-slate-100 ${isLate ? "bg-rose-50/20" : "hover:bg-slate-50"}`;
+        row.innerHTML = `
+            <td class="p-4 text-xs font-semibold text-slate-500 tabular-nums">${escapeHtml(formatDisplayDate(getRecordDateKey(log)))}</td>
+            <td class="p-4 text-xs font-semibold text-slate-400 tabular-nums">${escapeHtml(formatLoggedAt(log))}</td>
+            <td class="p-4 font-bold text-slate-900">${escapeHtml(log.routeId || "")}</td>
+            <td class="p-4 text-slate-500 font-medium">Standard Bus Fleet</td>
+            <td class="p-4">${escapeHtml(log.substitution || "None")}</td>
+            <td class="p-4 font-bold tabular-nums ${isLate ? "text-rose-600" : "text-blue-600"}">${escapeHtml(log.arrivalTime || "")}</td>
+            <td class="p-4 text-xs text-slate-600">${escapeHtml(log.notes || "N/A")}</td>`;
+        tableBody.appendChild(row);
+    });
+}
+
 // ---------------------------------------------------------
 // RESET: LOCAL SESSION ONLY — NEVER DELETES GOOGLE SHEETS
 // ---------------------------------------------------------
 function resetTodayView() {
     const confirmed = confirm(
-        "Start a fresh app session for today?\n\nAll historical records will remain in Google Sheets. The staff screen and today's counters will reset to Pending/0."
+        "Start a fresh app session for today?\n\nAll historical records will remain in Google Sheets and in the audit history. The staff screen and today's counters will reset to Pending/0."
     );
     if (!confirmed) return;
 
