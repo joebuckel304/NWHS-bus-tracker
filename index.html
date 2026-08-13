@@ -206,6 +206,52 @@ function getRecordEpoch(item) {
     return 0;
 }
 
+function looksLikeRoute(value) {
+    return /^Bus\s+/i.test(String(value || "").trim());
+}
+
+function normalizeSubmissionRecord(item) {
+    if (!item || typeof item !== "object") return item;
+
+    // Correct/current Apps Script response:
+    // id, date, timestamp, routeId, substitution, arrivalTime, rawTime, notes
+    if (looksLikeRoute(item.routeId)) {
+        return {
+            id: item.id || "",
+            date: item.date || "",
+            timestamp: item.timestamp || "",
+            routeId: item.routeId || "",
+            substitution: item.substitution || "None",
+            arrivalTime: item.arrivalTime || "",
+            rawTime: item.rawTime || "",
+            notes: item.notes || "N/A"
+        };
+    }
+
+    // Compatibility repair for an older Apps Script mapping after the Date
+    // column was inserted. In that response the values are shifted one field:
+    // timestamp=date, routeId=timestamp, substitution=routeId,
+    // arrivalTime=substitution, rawTime=arrivalTime, notes=rawTime.
+    if (looksLikeRoute(item.substitution)) {
+        const repairedRawTime = String(item.notes || "").match(/^\d{1,2}:\d{2}$/)
+            ? item.notes
+            : "";
+
+        return {
+            id: item.id || "",
+            date: item.timestamp || "",
+            timestamp: item.routeId || "",
+            routeId: item.substitution || "",
+            substitution: item.arrivalTime || "None",
+            arrivalTime: item.rawTime || "",
+            rawTime: repairedRawTime,
+            notes: "N/A"
+        };
+    }
+
+    return item;
+}
+
 let sessionResetCutoff = 0;
 
 function getResetCutoff() {
@@ -266,7 +312,13 @@ function callGoogleScript(params, callback) {
 function applyCloudData(data) {
     if (!data) return;
 
-    submissionsLog = Array.isArray(data.submissions) ? data.submissions : [];
+    const incomingSubmissions = Array.isArray(data.submissions)
+        ? data.submissions
+        : (Array.isArray(data.currentSubmissions) ? data.currentSubmissions : []);
+
+    submissionsLog = incomingSubmissions
+        .map(normalizeSubmissionRecord)
+        .filter(item => item && (item.id || item.routeId));
 
     // Always keep the 19 default buses visible; add any custom routes returned by Google Sheets.
     const cloudRoutes = Array.isArray(data.routes) ? data.routes.filter(Boolean) : [];
@@ -446,14 +498,13 @@ function addCustomBus() {
     }
 
     callGoogleScript({ action: "addRoute", routeId: route }, function(data) {
-        if (data && Array.isArray(data.routes) && data.routes.length > 0) {
-            activeBuses = data.routes;
-        } else {
-            activeBuses.push(route);
+        const cloudRoutes = data && Array.isArray(data.routes) ? data.routes.filter(Boolean) : [];
+        activeBuses = [...new Set([...DEFAULT_ROUTES, ...cloudRoutes, route])];
+        if (data) applyCloudData({ ...data, routes: activeBuses });
+        else {
+            renderStaffLoggingPanel();
+            updatePrincipalDashboardUI();
         }
-        submissionsLog = data && Array.isArray(data.submissions) ? data.submissions : submissionsLog;
-        renderStaffLoggingPanel();
-        updatePrincipalDashboardUI();
         showToastNotification(`Route "${route}" added.`);
     });
     input.value = "";
