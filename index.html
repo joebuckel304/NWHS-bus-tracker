@@ -647,5 +647,106 @@
             return `${formattedHours}:${minutes} ${suffix}`;
         }
     </script>
+    # Form Submission Integration Script
+
+/**
+ * WIRELESS DATA LINK EXTENSION
+ * Directions: Paste this entire block at the very bottom of your existing 
+ * <script> tag area, right before the closing </script> element.
+ * This completely isolates the background data logic from your visual HTML layouts.
+ */
+// 1. Ensure your spreadsheet web app URL variable is globally declaredconst GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec";
+// 2. Attach a submission interceptor listener to your existing HTML form
+document.addEventListener("DOMContentLoaded", function () {
+    // Automatically selects the primary form on your page
+    const arrivalForm = document.querySelector("form");
+
+    if (arrivalForm) {
+        arrivalForm.addEventListener("submit", function (event) {
+            event.preventDefault(); // Stop the page from reloading/refreshing
+
+            // Find the submit button to display visual status updates
+            const submitBtn = arrivalForm.querySelector("button[type='submit']") || arrivalForm.querySelector("button");
+            const originalBtnText = submitBtn ? submitBtn.textContent : "+ Add Record";
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Syncing with Cloud Sheet...";
+            }
+
+            // Dynamically extract values from your existing input fields safely
+            // Note: If your HTML elements have different IDs, adjust the strings inside getElementById mapping.
+            const routeElement = document.getElementById("route-id") || document.getElementById("routeSelect");
+            const busElement = document.getElementById("assigned-bus") || document.getElementById("busSelect");
+            const subElement = document.getElementById("substitute-bus") || document.getElementById("subSelect");
+            const statusElement = document.getElementById("recorded-arrival") || document.getElementById("statusSelect");
+            const notesElement = document.getElementById("operational-notes") || document.getElementById("notesTextArea");
+
+            // Compile the payload matching the action property pattern required by your script engine
+            const payload = {
+
+                action: "submit", // This key directs the Google Script to run an append operation rather than a clear operation
+                timestamp: new Date().toLocaleString(),
+                routeId: routeElement ? routeElement.value : "N/A",
+                busId: busElement ? busElement.value : "N/A",
+                subBus: subElement ? subElement.value : "None",
+                arrivalStatus: statusElement ? statusElement.value : "On Time",
+                notes: notesElement ? notesElement.value : "N/A"
+            };
+
+            // Execute submission through your file's native callGoogleScript carrier infrastructure
+            if (typeof callGoogleScript === "function") {
+                callGoogleScript(payload, function (response) {
+                    // Restore active interactive buttons states cleanly
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalBtnText;
+                    }
+
+                    // Optional: Reset text areas and dropdown options back to baseline standard indices
+
+                    if (notesElement) notesElement.value = "";
+                    
+                    // Trigger a basic structural alert validation toast notification
+                    if (typeof showToastNotification === "function") {
+                        showToastNotification("Arrival data synced successfully!");
+                    } else {
+                        alert("Arrival record logged successfully inside your Google Sheet!");
+                    }
+                });
+            } else {
+                // Fallback direct web pipeline utility block if the callGoogleScript function declaration is placed elsewhere
+                fetch(GOOGLE_SCRIPT_URL, {
+                    method: "POST",
+                    mode: "no-cors", // Essential mechanism configuration to bypass cross-origin browser network security limits
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                })
+
+                .then(function () {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalBtnText;
+                    }
+                    if (notesElement) notesElement.value = "";
+                    alert("Arrival record logged successfully inside your Google Sheet!");
+                })
+                .catch(function (error) {
+                    console.error("Data pipeline communication breakdown:", error);
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalBtnText;
+                    }
+                    alert("Network connection error encountered during transmission sync.");
+                });
+            }
+        });
+    }
+});
+
+
+
 </body>
 </html>
