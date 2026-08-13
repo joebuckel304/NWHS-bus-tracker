@@ -188,7 +188,57 @@ function normalizeDateKey(value) {
 }
 
 function getRecordDateKey(item) {
-    return normalizeDateKey(item.date) || normalizeDateKey(item.timestamp);
+    const explicitDate = normalizeDateKey(item && item.date);
+    if (explicitDate) return explicitDate;
+
+    const timestampDate = normalizeDateKey(item && item.timestamp);
+    if (timestampDate) return timestampDate;
+
+    // Google Apps Script records use IDs like log_1723570000000.
+    // If the sheet response omits Date/Logged At, recover the calendar date
+    // from that ID so today's records still count in the live dashboard.
+    if (item && typeof item.id === "string") {
+        const match = item.id.match(/^log_(\d{10,})$/);
+        if (match) {
+            const parsed = new Date(Number(match[1]));
+            if (!isNaN(parsed.getTime())) {
+                return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+            }
+        }
+    }
+
+    return "";
+}
+
+function normalizeSheetTime(value) {
+    if (!value) return { rawTime: "", displayTime: "" };
+    const text = String(value).trim();
+
+    // Normal HTML time value such as 08:47.
+    const hhmm = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (hhmm) {
+        const raw = `${String(Number(hhmm[1])).padStart(2, "0")}:${hhmm[2]}`;
+        return { rawTime: raw, displayTime: formatTime12H(raw) };
+    }
+
+    // Google Sheets time-only cells can come back from Apps Script as an
+    // ISO date based on 1899-12-30, e.g. 1899-12-30T18:10:00.000Z.
+    const sheetIso = text.match(/^1899-12-(?:30|31)T(\d{2}):(\d{2})/);
+    if (sheetIso) {
+        const raw = `${sheetIso[1]}:${sheetIso[2]}`;
+        return { rawTime: raw, displayTime: formatTime12H(raw) };
+    }
+
+    // Already-formatted 12-hour time.
+    const twelveHour = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (twelveHour) {
+        let h = Number(twelveHour[1]) % 12;
+        if (twelveHour[3].toUpperCase() === "PM") h += 12;
+        const raw = `${String(h).padStart(2, "0")}:${twelveHour[2]}`;
+        return { rawTime: raw, displayTime: `${Number(twelveHour[1])}:${twelveHour[2]} ${twelveHour[3].toUpperCase()}` };
+    }
+
+    return { rawTime: "", displayTime: text };
 }
 
 function getRecordEpoch(item) {
@@ -219,14 +269,16 @@ function normalizeSubmissionRecord(item) {
     // Correct/current Apps Script response:
     // id, date, timestamp, routeId, substitution, arrivalTime, rawTime, notes
     if (looksLikeRoute(item.routeId)) {
+        const normalizedArrival = normalizeSheetTime(item.rawTime || item.arrivalTime);
+        const normalizedRaw = normalizeSheetTime(item.rawTime);
         return {
             id: item.id || "",
             date: item.date || "",
             timestamp: item.timestamp || "",
             routeId: item.routeId || "",
             substitution: item.substitution || "None",
-            arrivalTime: item.arrivalTime || "",
-            rawTime: item.rawTime || "",
+            arrivalTime: normalizedArrival.displayTime || item.arrivalTime || "",
+            rawTime: normalizedRaw.rawTime || normalizedArrival.rawTime || "",
             notes: item.notes || "N/A"
         };
     }
@@ -240,14 +292,15 @@ function normalizeSubmissionRecord(item) {
             ? item.notes
             : "";
 
+        const normalizedArrival = normalizeSheetTime(item.rawTime || repairedRawTime);
         return {
             id: item.id || "",
             date: item.timestamp || "",
             timestamp: item.routeId || "",
             routeId: item.substitution || "",
             substitution: item.arrivalTime || "None",
-            arrivalTime: item.rawTime || "",
-            rawTime: repairedRawTime,
+            arrivalTime: normalizedArrival.displayTime || item.rawTime || "",
+            rawTime: normalizedArrival.rawTime || repairedRawTime,
             notes: "N/A"
         };
     }
@@ -340,11 +393,14 @@ function applyCloudData(data) {
 
         // Remove optimistic local records once the same route/time is visible from Google Sheets.
         pendingLocalSubmissions = pendingLocalSubmissions.filter(localItem => {
-            return !submissionsLog.some(cloudItem =>
-                cloudItem.routeId === localItem.routeId &&
-                (cloudItem.rawTime === localItem.rawTime || cloudItem.arrivalTime === localItem.arrivalTime) &&
-                getRecordDateKey(cloudItem) === getRecordDateKey(localItem)
-            );
+            return !submissionsLog.some(cloudItem => {
+                const sameId = cloudItem.id && localItem.id && cloudItem.id === localItem.id;
+                const sameRouteAndTime = cloudItem.routeId === localItem.routeId &&
+                    (cloudItem.rawTime === localItem.rawTime || cloudItem.arrivalTime === localItem.arrivalTime);
+                const cloudDate = getRecordDateKey(cloudItem);
+                const localDate = getRecordDateKey(localItem);
+                return sameId || (sameRouteAndTime && (!cloudDate || !localDate || cloudDate === localDate));
+            });
         });
         localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(pendingLocalSubmissions));
     }
@@ -636,7 +692,7 @@ function updatePrincipalDashboardUI() {
         row.className = `transition-colors border-b border-slate-100 ${isLate ? "bg-rose-50/20" : "hover:bg-slate-50"}`;
         row.innerHTML = `
             <td class="p-4 text-xs font-semibold text-slate-500 tabular-nums">${escapeHtml(formatDisplayDate(getRecordDateKey(log)))}</td>
-            <td class="p-4 text-xs font-semibold text-slate-400 tabular-nums">${escapeHtml(log.timestamp || "Synced")}</td>
+            <td class="p-4 text-xs font-semibold text-slate-400 tabular-nums">${escapeHtml(formatLoggedAt(log))}</td>
             <td class="p-4 font-bold text-slate-900">${escapeHtml(log.routeId || "")}</td>
             <td class="p-4 text-slate-500 font-medium">Standard Bus Fleet</td>
             <td class="p-4">${escapeHtml(log.substitution || "None")}</td>
@@ -672,6 +728,16 @@ function formatTime12H(value) {
     const [h, m] = value.split(":");
     const hh = parseInt(h, 10);
     return `${((hh + 11) % 12) + 1}:${m} ${hh >= 12 ? "PM" : "AM"}`;
+}
+
+
+function formatLoggedAt(item) {
+    if (item && item.timestamp) return String(item.timestamp);
+    const epoch = getRecordEpoch(item);
+    if (epoch) {
+        return new Date(epoch).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    }
+    return "Synced";
 }
 
 function formatDisplayDate(dateKey) {
