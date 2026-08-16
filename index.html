@@ -45,6 +45,20 @@
     </div>
 
     <section id="view-logging" class="space-y-6">
+        <div id="staff-auth-wall" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-xl text-center space-y-5 my-8">
+            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">🔒</div>
+            <div>
+                <h3 class="text-lg font-bold text-slate-900">Staff Verification</h3>
+                <p class="text-xs text-slate-500 mt-1">Enter the staff access PIN to open the bus logging panel.</p>
+            </div>
+            <div class="space-y-2">
+                <input type="password" id="staff-pin" placeholder="Enter Staff Password" class="w-full text-center border border-slate-300 rounded-xl py-3 px-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest font-mono" onkeydown="if(event.key === 'Enter') verifyStaffAccess()">
+                <p id="staff-auth-error" class="text-xs text-red-600 hidden font-medium">Incorrect staff credentials. Please try again.</p>
+            </div>
+            <button onclick="verifyStaffAccess()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800 transition-colors shadow-md touch-target">Authorize & Enter Logging Panel</button>
+        </div>
+
+        <div id="staff-logging-content" class="hidden space-y-6">
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h2 class="text-xl font-bold text-slate-900">Active Bus Check-In</h2>
@@ -56,6 +70,7 @@
             </div>
         </div>
         <div id="bus-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </div>
     </section>
 
     <section id="view-review" class="hidden space-y-6">
@@ -73,10 +88,14 @@
         </div>
 
         <div id="principal-dashboard-content" class="hidden space-y-6">
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Submissions</div>
                     <div id="kpi-total" class="text-2xl font-black text-slate-900 mt-1">0</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold text-blue-500 uppercase tracking-wider">Pending Buses</div>
+                    <div id="kpi-pending" class="text-2xl font-black text-blue-600 mt-1">19</div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">On-Time Arrivals</div>
@@ -154,6 +173,7 @@ let submissionsLog = [];
 const SESSION_RESET_KEY = "bussync_session_reset_cutoff";
 const LOCAL_PENDING_KEY = "bussync_pending_submissions";
 let pendingLocalSubmissions = [];
+const staffDrafts = new Map();
 
 // ---------------------------------------------------------
 // DATE + SESSION HELPERS
@@ -225,7 +245,15 @@ function normalizeSheetTime(value) {
     // ISO date based on 1899-12-30, e.g. 1899-12-30T18:10:00.000Z.
     const sheetIso = text.match(/^1899-12-(?:30|31)T(\d{2}):(\d{2})/);
     if (sheetIso) {
-        const raw = `${sheetIso[1]}:${sheetIso[2]}`;
+        // A time-only Google Sheets cell is serialized against the 1899 epoch in UTC.
+        // For this Sheet, the returned value is consistently five hours ahead of the
+        // intended school-local time. Convert that transport value back before using
+        // it for the Principal Portal display or the 9:25 AM late-arrival comparison.
+        const utcMinutes = Number(sheetIso[1]) * 60 + Number(sheetIso[2]);
+        const localMinutes = (utcMinutes - (5 * 60) + (24 * 60)) % (24 * 60);
+        const h = Math.floor(localMinutes / 60);
+        const m = localMinutes % 60;
+        const raw = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
         return { rawTime: raw, displayTime: formatTime12H(raw) };
     }
 
@@ -467,6 +495,24 @@ function showToastNotification(message) {
 function renderStaffLoggingPanel() {
     const container = document.getElementById("bus-cards-container");
     if (!container) return;
+
+    // Cloud refreshes redraw the cards every 15 seconds. Preserve anything a staff
+    // member is currently typing so arrival time, substitution, and notes survive
+    // those automatic refreshes until the record is submitted.
+    container.querySelectorAll("[data-bus-route]").forEach(existingCard => {
+        const route = existingCard.dataset.busRoute;
+        const timeField = existingCard.querySelector(".arrival-time-input");
+        const subField = existingCard.querySelector(".substitution-input");
+        const notesField = existingCard.querySelector(".notes-input");
+        if (route && (timeField || subField || notesField)) {
+            staffDrafts.set(route, {
+                time: timeField ? timeField.value : "",
+                substitution: subField ? subField.value : "",
+                notes: notesField ? notesField.value : ""
+            });
+        }
+    });
+
     container.innerHTML = "";
 
     let currentSession = [];
@@ -482,6 +528,7 @@ function renderStaffLoggingPanel() {
     routesToRender.forEach((busRoute, idx) => {
         const currentSubmission = currentSession.find(item => item.routeId === busRoute);
         const card = document.createElement("div");
+        card.dataset.busRoute = busRoute;
 
         card.className = `p-5 rounded-2xl border transition-all duration-200 bg-white ${
             currentSubmission
@@ -514,17 +561,17 @@ function renderStaffLoggingPanel() {
                     <div>
                         <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Arrival Timestamp</label>
                         <div class="flex space-x-2">
-                            <input type="time" id="time-${idx}" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-semibold">
+                            <input type="time" id="time-${idx}" class="arrival-time-input flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-semibold">
                             <button onclick="stampCurrentTime(${idx})" class="bg-slate-900 text-white font-bold text-xs px-3 rounded-xl hover:bg-slate-800 touch-target whitespace-nowrap">⏱ Now</button>
                         </div>
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Fleet Sub Bus # (Optional)</label>
-                        <input type="text" id="sub-${idx}" placeholder="e.g. Bus 42-B" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-medium">
+                        <input type="text" id="sub-${idx}" placeholder="e.g. Bus 42-B" class="substitution-input w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target font-medium">
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Operational Notes / Comments</label>
-                        <textarea id="notes-${idx}" rows="2" placeholder="Delay details, parent complaints, etc." class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"></textarea>
+                        <textarea id="notes-${idx}" rows="2" placeholder="Delay details, parent complaints, etc." class="notes-input w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"></textarea>
                     </div>
                 </div>
                 <button onclick="submitBusRecord('${escapeJs(busRoute)}', ${idx})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl shadow-md touch-target">✔ Log Arrival Data</button>`;
@@ -532,6 +579,18 @@ function renderStaffLoggingPanel() {
 
         card.innerHTML = html;
         container.appendChild(card);
+
+        if (!currentSubmission && staffDrafts.has(busRoute)) {
+            const draft = staffDrafts.get(busRoute);
+            const timeField = card.querySelector(".arrival-time-input");
+            const subField = card.querySelector(".substitution-input");
+            const notesField = card.querySelector(".notes-input");
+            if (timeField) timeField.value = draft.time || "";
+            if (subField) subField.value = draft.substitution || "";
+            if (notesField) notesField.value = draft.notes || "";
+        }
+
+        if (currentSubmission) staffDrafts.delete(busRoute);
     });
 }
 
@@ -565,6 +624,8 @@ function submitBusRecord(routeId, idx) {
         substitution: subField && subField.value.trim() ? subField.value.trim() : "None",
         notes: notesField && notesField.value.trim() ? notesField.value.trim() : "N/A"
     };
+
+    staffDrafts.delete(routeId);
 
     // Update the staff card and principal dashboard immediately.
     pendingLocalSubmissions = pendingLocalSubmissions.filter(item => item.routeId !== routeId);
@@ -620,6 +681,24 @@ function addCustomBus() {
 }
 
 // ---------------------------------------------------------
+// STAFF AUTHENTICATION
+// ---------------------------------------------------------
+function verifyStaffAccess() {
+    const pinField = document.getElementById("staff-pin");
+    const pin = pinField ? pinField.value : "";
+    if (pin === ADMIN_PIN) {
+        document.getElementById("staff-auth-error").classList.add("hidden");
+        document.getElementById("staff-auth-wall").classList.add("hidden");
+        document.getElementById("staff-logging-content").classList.remove("hidden");
+        renderStaffLoggingPanel();
+        showToastNotification("🔒 Staff access granted.");
+    } else {
+        document.getElementById("staff-auth-error").classList.remove("hidden");
+        if (pinField) pinField.value = "";
+    }
+}
+
+// ---------------------------------------------------------
 // ADMIN / DASHBOARD
 // ---------------------------------------------------------
 function verifyAdminAccess() {
@@ -644,6 +723,7 @@ function updatePrincipalDashboardUI() {
     const onTimeCount = currentSession.length - lateArrivals.length;
 
     document.getElementById("kpi-total").innerText = currentSession.length;
+    document.getElementById("kpi-pending").innerText = missingBuses.length;
     document.getElementById("kpi-ontime").innerText = onTimeCount;
     document.getElementById("kpi-subs").innerText = currentSession.filter(item => item.substitution && item.substitution !== "None").length;
     document.getElementById("kpi-notes").innerText = currentSession.filter(item => item.notes && item.notes !== "N/A").length;
@@ -714,6 +794,7 @@ function resetTodayView() {
     sessionResetCutoff = Date.now();
     localStorage.setItem(SESSION_RESET_KEY, String(sessionResetCutoff));
     pendingLocalSubmissions = [];
+    staffDrafts.clear();
     localStorage.removeItem(LOCAL_PENDING_KEY);
     renderStaffLoggingPanel();
     updatePrincipalDashboardUI();
