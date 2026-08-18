@@ -433,12 +433,23 @@ function applyCloudData(data) {
         localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(pendingLocalSubmissions));
     }
 
-    // Never remove the fixed 19-bus fleet merely because a cloud response omitted routes.
+    // Google Sheets is the source of truth for route names.
+    // The built-in list is only a startup/offline fallback. If the Sheet returns
+    // a route list, replace the app's route list instead of merging it with defaults.
     if (Array.isArray(data.routes)) {
-        const cloudRoutes = data.routes.filter(Boolean);
-        activeBuses = [...new Set([...DEFAULT_ROUTES, ...cloudRoutes])];
-    } else {
-        activeBuses = [...new Set([...DEFAULT_ROUTES, ...activeBuses])];
+        const cloudRoutes = [...new Set(
+            data.routes
+                .map(route => String(route || "").trim())
+                .filter(Boolean)
+        )];
+
+        if (cloudRoutes.length) {
+            activeBuses = cloudRoutes;
+        } else if (!activeBuses.length) {
+            activeBuses = [...DEFAULT_ROUTES];
+        }
+    } else if (!activeBuses.length) {
+        activeBuses = [...DEFAULT_ROUTES];
     }
 
     renderStaffLoggingPanel();
@@ -523,7 +534,11 @@ function renderStaffLoggingPanel() {
         currentSession = [];
     }
 
-    const routesToRender = [...new Set([...DEFAULT_ROUTES, ...(Array.isArray(activeBuses) ? activeBuses : [])])];
+    // Once Google Sheets has supplied routes, render that exact list.
+    // Fall back to the built-in routes only if no route list is available.
+    const routesToRender = Array.isArray(activeBuses) && activeBuses.length
+        ? [...new Set(activeBuses)]
+        : [...DEFAULT_ROUTES];
 
     routesToRender.forEach((busRoute, idx) => {
         const currentSubmission = currentSession.find(item => item.routeId === busRoute);
@@ -668,8 +683,16 @@ function addCustomBus() {
     }
 
     callGoogleScript({ action: "addRoute", routeId: route }, function(data) {
-        const cloudRoutes = data && Array.isArray(data.routes) ? data.routes.filter(Boolean) : [];
-        activeBuses = [...new Set([...DEFAULT_ROUTES, ...cloudRoutes, route])];
+        const cloudRoutes = data && Array.isArray(data.routes)
+            ? [...new Set(data.routes.map(item => String(item || "").trim()).filter(Boolean))]
+            : [];
+
+        // Prefer the Sheet's returned list. If the response does not include routes,
+        // append the new route locally until the next successful cloud refresh.
+        activeBuses = cloudRoutes.length
+            ? cloudRoutes
+            : [...new Set([...activeBuses, route])];
+
         if (data) applyCloudData({ ...data, routes: activeBuses });
         else {
             renderStaffLoggingPanel();
