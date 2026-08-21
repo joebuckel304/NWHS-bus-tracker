@@ -173,6 +173,7 @@ const SESSION_RESET_KEY = "bussync_session_reset_cutoff";
 const LOCAL_PENDING_KEY = "bussync_pending_submissions";
 let pendingLocalSubmissions = [];
 const staffDrafts = new Map();
+const editingRoutes = new Set();
 
 // ---------------------------------------------------------
 // DATE + SESSION HELPERS
@@ -540,7 +541,8 @@ function renderStaffLoggingPanel() {
         : [...DEFAULT_ROUTES];
 
     routesToRender.forEach((busRoute, idx) => {
-        const currentSubmission = currentSession.find(item => item.routeId === busRoute);
+        const savedSubmission = currentSession.find(item => item.routeId === busRoute);
+        const currentSubmission = editingRoutes.has(busRoute) ? null : savedSubmission;
         const card = document.createElement("div");
         card.dataset.busRoute = busRoute;
 
@@ -604,7 +606,7 @@ function renderStaffLoggingPanel() {
             if (notesField) notesField.value = draft.notes || "";
         }
 
-        if (currentSubmission) staffDrafts.delete(busRoute);
+        if (currentSubmission && !editingRoutes.has(busRoute)) staffDrafts.delete(busRoute);
     });
 }
 
@@ -640,6 +642,7 @@ function submitBusRecord(routeId, idx) {
     };
 
     staffDrafts.delete(routeId);
+    editingRoutes.delete(routeId);
 
     // Update the staff card and principal dashboard immediately.
     pendingLocalSubmissions = pendingLocalSubmissions.filter(item => item.routeId !== routeId);
@@ -665,10 +668,37 @@ function submitBusRecord(routeId, idx) {
 }
 
 function undoSubmission(routeId) {
-    showToastNotification("Reopening today's row entry...");
+    // Reopen the card immediately in the browser instead of waiting for Apps Script.
+    // This keeps editing usable even if the Sheet's undo action is slow or unavailable.
+    const currentSession = getCurrentSessionSubmissions();
+    const record = currentSession.find(item => item.routeId === routeId);
+
+    if (!record) {
+        showToastNotification("⚠️ Could not find the current submission to edit.");
+        return;
+    }
+
+    staffDrafts.set(routeId, {
+        time: record.rawTime || rawTimeFromDisplay(record.arrivalTime || ""),
+        substitution: record.substitution && record.substitution !== "None" ? record.substitution : "",
+        notes: record.notes && record.notes !== "N/A" ? record.notes : ""
+    });
+    editingRoutes.add(routeId);
+
+    // If this route is still represented by an optimistic local record, remove that
+    // copy so the edit form does not immediately flip back to Arrived.
+    pendingLocalSubmissions = pendingLocalSubmissions.filter(item => item.routeId !== routeId);
+    localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(pendingLocalSubmissions));
+
+    renderStaffLoggingPanel();
+    showToastNotification(`${routeId} reopened for editing.`);
+
+    // Still ask the Sheet backend to reopen/remove the current row if supported.
+    // The UI remains editable regardless of the response.
     callGoogleScript({ action: "undo", routeId }, function(data) {
-        applyCloudData(data);
-        showToastNotification("Record reopened.");
+        if (data) applyCloudData(data);
+        // applyCloudData redraws the screen, so render once more while preserving edit mode.
+        renderStaffLoggingPanel();
     });
 }
 
@@ -831,6 +861,7 @@ function resetTodayView() {
     localStorage.setItem(SESSION_RESET_KEY, String(sessionResetCutoff));
     pendingLocalSubmissions = [];
     staffDrafts.clear();
+    editingRoutes.clear();
     localStorage.removeItem(LOCAL_PENDING_KEY);
     renderStaffLoggingPanel();
     updatePrincipalDashboardUI();
@@ -840,6 +871,19 @@ function resetTodayView() {
 // ---------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------
+function rawTimeFromDisplay(value) {
+    if (!value) return "";
+    const text = String(value).trim();
+    const direct = text.match(/^(\d{1,2}):(\d{2})$/);
+    if (direct) return `${String(Number(direct[1])).padStart(2, "0")}:${direct[2]}`;
+
+    const twelveHour = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!twelveHour) return "";
+    let hour = Number(twelveHour[1]) % 12;
+    if (twelveHour[3].toUpperCase() === "PM") hour += 12;
+    return `${String(hour).padStart(2, "0")}:${twelveHour[2]}`;
+}
+
 function formatTime12H(value) {
     if (!value) return "";
     const [h, m] = value.split(":");
