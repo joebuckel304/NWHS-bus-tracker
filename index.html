@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buckel Up | Northwest Guilford High School</title>
+    <title>Bus Tracker | Northwest Guilford High School</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .touch-target { min-height: 44px; }
@@ -18,7 +18,7 @@
         <div class="flex items-center space-x-3">
             <div class="w-10 h-10 flex items-center justify-center rounded-xl bg-yellow-100 border border-yellow-300 text-2xl" aria-label="Yellow school bus">🚌</div>
             <div>
-                <h1 class="text-lg font-bold tracking-tight text-slate-900">Buckel Up</h1>
+                <h1 class="text-lg font-bold tracking-tight text-slate-900">Bus Tracker</h1>
                 <p class="text-xs text-slate-500 font-medium">Northwest Guilford High School</p>
             </div>
         </div>
@@ -106,7 +106,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Missing Check-Ins (Pending Fleet)</h3>
                     <div id="missing-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
@@ -114,6 +114,10 @@
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3">Late Arrivals (Logged After 9:25 AM)</h3>
                     <div id="late-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-3">On-Time Arrivals (By 9:25 AM)</h3>
+                    <div id="ontime-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
             </div>
 
@@ -738,7 +742,8 @@ function updatePrincipalDashboardUI() {
     const loggedRouteIds = currentSession.map(item => item.routeId);
     const missingBuses = activeBuses.filter(bus => !loggedRouteIds.includes(bus));
     const lateArrivals = currentSession.filter(item => item.rawTime && item.rawTime > "09:25");
-    const onTimeCount = currentSession.length - lateArrivals.length;
+    const onTimeArrivals = currentSession.filter(item => item.rawTime && item.rawTime <= "09:25");
+    const onTimeCount = onTimeArrivals.length;
 
     document.getElementById("kpi-total").innerText = currentSession.length;
     document.getElementById("kpi-pending").innerText = missingBuses.length;
@@ -769,6 +774,19 @@ function updatePrincipalDashboardUI() {
             badge.className = "bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
             badge.innerText = `${log.routeId} — ${log.arrivalTime}`;
             lateContainer.appendChild(badge);
+        });
+    }
+
+    const onTimeContainer = document.getElementById("ontime-buses-list");
+    onTimeContainer.innerHTML = "";
+    if (onTimeArrivals.length === 0) {
+        onTimeContainer.innerHTML = '<span class="text-xs text-slate-500 font-medium italic py-1">No on-time arrivals recorded yet.</span>';
+    } else {
+        onTimeArrivals.forEach(log => {
+            const badge = document.createElement("span");
+            badge.className = "bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
+            badge.innerText = `${log.routeId} — ${log.arrivalTime}`;
+            onTimeContainer.appendChild(badge);
         });
     }
 
