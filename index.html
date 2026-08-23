@@ -34,9 +34,10 @@
         <span id="toast-message" class="text-sm font-medium"></span>
     </div>
 
-    <div class="flex bg-slate-200/80 p-1 rounded-xl max-w-md w-full border border-slate-300/50 shadow-inner">
+    <div class="flex bg-slate-200/80 p-1 rounded-xl max-w-2xl w-full border border-slate-300/50 shadow-inner">
         <button id="tab-logging" onclick="switchTab('logging')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target">Staff Logging Panel</button>
         <button id="tab-review" onclick="switchTab('review')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target">Principal Portal</button>
+        <button id="tab-reports" onclick="switchTab('reports')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target">Reports</button>
     </div>
 
     <section id="view-logging" class="space-y-6">
@@ -154,6 +155,146 @@
             </div>
         </div>
     </section>
+
+    <section id="view-reports" class="hidden space-y-6">
+        <div id="reports-auth-wall" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-xl text-center space-y-5 my-8">
+            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">📊</div>
+            <div>
+                <h3 class="text-lg font-bold text-slate-900">Reporting Access</h3>
+                <p class="text-xs text-slate-500 mt-1">Enter the administrator PIN to view instructional-impact reports.</p>
+            </div>
+            <div class="space-y-2">
+                <input type="password" id="reports-pin" placeholder="Enter Admin Password" class="w-full text-center border border-slate-300 rounded-xl py-3 px-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest font-mono" onkeydown="if(event.key === 'Enter') verifyReportsAccess()">
+                <p id="reports-auth-error" class="text-xs text-red-600 hidden font-medium">Incorrect administrative credentials. Please try again.</p>
+            </div>
+            <button onclick="verifyReportsAccess()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800 transition-colors shadow-md touch-target">Authorize & View Reports</button>
+        </div>
+
+        <div id="reports-dashboard-content" class="hidden space-y-6">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900">Instructional Impact Reporting</h2>
+                    <p class="text-sm text-slate-500 mt-0.5">9:21 AM arrival-ready threshold · Delay/Closure dates excluded · Arrival Not Captured flagged separately.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="report-generated-at" class="text-xs text-slate-400 font-medium"></span>
+                    <button onclick="fetchReportData(true)" class="bg-blue-600 text-white font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-sm touch-target">Refresh Reports</button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Year-to-Date Snapshot</h3>
+                <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Arrival Records</div>
+                        <div id="report-ytd-records" class="text-2xl font-black text-slate-900 mt-1">—</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">On-Time Rate</div>
+                        <div id="report-ytd-ontime" class="text-2xl font-black text-emerald-600 mt-1">—</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-blue-500 uppercase tracking-wider">Average Arrival</div>
+                        <div id="report-ytd-average" class="text-2xl font-black text-blue-600 mt-1">—</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">No-Capture Flags</div>
+                        <div id="report-ytd-exceptions" class="text-2xl font-black text-rose-600 mt-1">—</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-amber-500 uppercase tracking-wider">High-Impact Days</div>
+                        <div id="report-ytd-highimpact" class="text-2xl font-black text-amber-600 mt-1">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-start justify-between gap-4 mb-4">
+                        <div>
+                            <h3 class="font-bold text-slate-900">YTD Potential Instructional Minutes Missed</h3>
+                            <p class="text-xs text-slate-500 mt-1">Per student, ranked by route. No-capture flags are not assigned minutes.</p>
+                        </div>
+                    </div>
+                    <div id="report-ytd-impact-bars" class="space-y-3"></div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="mb-4">
+                        <h3 class="font-bold text-slate-900">YTD On-Time Performance</h3>
+                        <p class="text-xs text-slate-500 mt-1">Percentage of captured arrivals meeting the 9:21 AM threshold.</p>
+                    </div>
+                    <div id="report-ytd-ontime-bars" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between gap-4 mb-3">
+                    <div>
+                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">Selected Week</h3>
+                        <p id="report-week-label" class="text-sm font-semibold text-slate-700 mt-1"></p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Arrivals Logged</div>
+                        <div id="report-week-records" class="text-2xl font-black text-slate-900 mt-1">—</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">On-Time Rate</div>
+                        <div id="report-week-ontime" class="text-2xl font-black text-emerald-600 mt-1">—</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">No-Capture Flags</div>
+                        <div id="report-week-exceptions" class="text-2xl font-black text-rose-600 mt-1">—</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-amber-500 uppercase tracking-wider">High-Impact Days</div>
+                        <div id="report-week-highimpact" class="text-2xl font-black text-amber-600 mt-1">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="mb-4">
+                    <h3 class="font-bold text-slate-900">Selected Week: Potential Minutes Missed per Student</h3>
+                    <p class="text-xs text-slate-500 mt-1">Only captured arrivals are assigned instructional minutes.</p>
+                </div>
+                <div id="report-week-impact-bars" class="space-y-3"></div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                <div class="p-5 border-b border-slate-200">
+                    <h3 class="font-bold text-slate-900">Route-Level Year-to-Date Detail</h3>
+                    <p class="text-xs text-slate-500 mt-1">Useful for identifying routes whose students may need additional academic support.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+                                <th class="p-3">Route</th>
+                                <th class="p-3">Avg Arrival</th>
+                                <th class="p-3">On-Time</th>
+                                <th class="p-3">Late Days</th>
+                                <th class="p-3">Avg Missed When Late</th>
+                                <th class="p-3">YTD Min / Student</th>
+                                <th class="p-3">High Impact</th>
+                                <th class="p-3">No Capture</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-route-table" class="divide-y divide-slate-100 text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-rose-200 shadow-sm">
+                <h3 class="font-bold text-rose-700">Unresolved Arrival Not Captured — GPS Follow-Up</h3>
+                <p class="text-xs text-slate-500 mt-1 mb-4">These records do not receive an instructional-loss value until the actual arrival is verified.</p>
+                <div id="report-exception-list" class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
+    </section>
+
 </main>
 
 <script>
@@ -479,16 +620,23 @@ function startLiveClock() {
 
 function switchTab(target) {
     const logging = target === "logging";
+    const review = target === "review";
+    const reports = target === "reports";
+
     document.getElementById("view-logging").classList.toggle("hidden", !logging);
-    document.getElementById("view-review").classList.toggle("hidden", logging);
+    document.getElementById("view-review").classList.toggle("hidden", !review);
+    document.getElementById("view-reports").classList.toggle("hidden", !reports);
 
-    document.getElementById("tab-logging").className = logging
-        ? "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target"
-        : "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target";
+    const activeClass = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target";
+    const inactiveClass = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target";
 
-    document.getElementById("tab-review").className = !logging
-        ? "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target"
-        : "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target";
+    document.getElementById("tab-logging").className = logging ? activeClass : inactiveClass;
+    document.getElementById("tab-review").className = review ? activeClass : inactiveClass;
+    document.getElementById("tab-reports").className = reports ? activeClass : inactiveClass;
+
+    if (reports && reportsAuthorized) {
+        fetchReportData(false);
+    }
 }
 
 let toastTimer;
@@ -846,6 +994,245 @@ function updatePrincipalDashboardUI() {
             <td class="p-4 text-xs text-slate-600">${escapeHtml(log.notes || "N/A")}</td>`;
         tableBody.appendChild(row);
     });
+}
+
+
+// ---------------------------------------------------------
+// REPORTING DASHBOARD
+// ---------------------------------------------------------
+let reportsAuthorized = false;
+let reportRefreshTimer = null;
+
+function verifyReportsAccess() {
+    const pin = document.getElementById("reports-pin").value;
+
+    if (pin === ADMIN_PIN) {
+        reportsAuthorized = true;
+        document.getElementById("reports-auth-error").classList.add("hidden");
+        document.getElementById("reports-auth-wall").classList.add("hidden");
+        document.getElementById("reports-dashboard-content").classList.remove("hidden");
+        fetchReportData(true);
+
+        if (!reportRefreshTimer) {
+            reportRefreshTimer = setInterval(() => {
+                if (reportsAuthorized) fetchReportData(false);
+            }, 60000);
+        }
+    } else {
+        document.getElementById("reports-auth-error").classList.remove("hidden");
+        document.getElementById("reports-pin").value = "";
+    }
+}
+
+function fetchReportData(showNotice) {
+    if (!reportsAuthorized) return;
+
+    callGoogleScript({ action: "report" }, function(data) {
+        if (!data || !data.reporting) {
+            showToastNotification("⚠️ Reporting API not found. Update Apps Script with the reporting add-on.");
+            return;
+        }
+
+        renderReportsDashboard(data.reporting);
+
+        if (showNotice) {
+            showToastNotification("Reports refreshed from Google Sheets.");
+        }
+    });
+}
+
+function renderReportsDashboard(reporting) {
+    const ytd = Array.isArray(reporting.ytd) ? reporting.ytd : [];
+    const weekly = Array.isArray(reporting.weekly) ? reporting.weekly : [];
+    const exceptions = Array.isArray(reporting.unresolvedExceptions) ? reporting.unresolvedExceptions : [];
+
+    document.getElementById("report-generated-at").innerText =
+        reporting.generatedAt ? `Updated ${reporting.generatedAt}` : "";
+
+    const ytdSummary = summarizeReportRows(ytd);
+    const weekSummary = summarizeReportRows(weekly);
+
+    document.getElementById("report-ytd-records").innerText = ytdSummary.records;
+    document.getElementById("report-ytd-ontime").innerText = formatPercent(ytdSummary.onTimePct);
+    document.getElementById("report-ytd-average").innerText = formatMinutesAsTime(ytdSummary.avgArrivalMinutes);
+    document.getElementById("report-ytd-exceptions").innerText = ytdSummary.noCapture;
+    document.getElementById("report-ytd-highimpact").innerText = ytdSummary.highImpactDays;
+
+    document.getElementById("report-week-records").innerText = weekSummary.records;
+    document.getElementById("report-week-ontime").innerText = formatPercent(weekSummary.onTimePct);
+    document.getElementById("report-week-exceptions").innerText = weekSummary.noCapture;
+    document.getElementById("report-week-highimpact").innerText = weekSummary.highImpactDays;
+
+    document.getElementById("report-week-label").innerText = reporting.selectedWeekStart
+        ? `Week of ${formatReportDate(reporting.selectedWeekStart)}`
+        : "Selected reporting week";
+
+    renderReportBars(
+        "report-ytd-impact-bars",
+        ytd,
+        "potentialMissedPerStudent",
+        value => `${Math.round(Number(value) || 0)} min`,
+        null
+    );
+
+    renderReportBars(
+        "report-ytd-ontime-bars",
+        [...ytd].sort((a, b) => (Number(a.onTimePct) || 0) - (Number(b.onTimePct) || 0)),
+        "onTimePct",
+        value => formatPercent(Number(value) || 0),
+        1
+    );
+
+    renderReportBars(
+        "report-week-impact-bars",
+        weekly,
+        "potentialMissedPerStudent",
+        value => `${Math.round(Number(value) || 0)} min`,
+        null
+    );
+
+    renderReportRouteTable(ytd);
+    renderReportExceptions(exceptions);
+}
+
+function summarizeReportRows(rows) {
+    let records = 0;
+    let onTimeDays = 0;
+    let arrivalWeightedTotal = 0;
+    let noCapture = 0;
+    let highImpactDays = 0;
+
+    rows.forEach(row => {
+        const days = Number(row.daysLogged) || 0;
+        records += days;
+        onTimeDays += Number(row.onTimeDays) || 0;
+        noCapture += Number(row.noCapture) || 0;
+        highImpactDays += Number(row.highImpactDays) || 0;
+
+        if (days && row.avgArrivalMinutes !== null && row.avgArrivalMinutes !== undefined) {
+            arrivalWeightedTotal += Number(row.avgArrivalMinutes) * days;
+        }
+    });
+
+    return {
+        records,
+        onTimePct: records ? onTimeDays / records : 0,
+        avgArrivalMinutes: records ? arrivalWeightedTotal / records : null,
+        noCapture,
+        highImpactDays
+    };
+}
+
+function renderReportBars(containerId, rows, metricKey, formatter, fixedMax) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+
+    const meaningful = rows
+        .filter(row => row && row.route)
+        .slice(0, 19);
+
+    if (!meaningful.length) {
+        container.innerHTML = '<p class="text-sm text-slate-400 italic">No reporting data available yet.</p>';
+        return;
+    }
+
+    const maxValue = fixedMax || Math.max(
+        1,
+        ...meaningful.map(row => Number(row[metricKey]) || 0)
+    );
+
+    meaningful.forEach(row => {
+        const value = Number(row[metricKey]) || 0;
+        const width = Math.max(2, Math.min(100, (value / maxValue) * 100));
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "space-y-1";
+
+        wrapper.innerHTML = `
+            <div class="flex items-center justify-between gap-3 text-xs">
+                <span class="font-bold text-slate-700 truncate">${escapeHtml(row.route)}</span>
+                <span class="font-black text-slate-900 tabular-nums whitespace-nowrap">${escapeHtml(formatter(value))}</span>
+            </div>
+            <div class="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
+                <div class="h-full rounded-full bg-blue-500" style="width:${width}%"></div>
+            </div>`;
+
+        container.appendChild(wrapper);
+    });
+}
+
+function renderReportRouteTable(rows) {
+    const tbody = document.getElementById("report-route-table");
+    tbody.innerHTML = "";
+
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-slate-400">No route reporting data available.</td></tr>';
+        return;
+    }
+
+    rows.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-50";
+
+        const noCapture = Number(row.noCapture) || 0;
+
+        tr.innerHTML = `
+            <td class="p-3 font-bold text-slate-900">${escapeHtml(row.route)}</td>
+            <td class="p-3 tabular-nums">${escapeHtml(formatMinutesAsTime(row.avgArrivalMinutes))}</td>
+            <td class="p-3 font-bold">${escapeHtml(formatPercent(Number(row.onTimePct) || 0))}</td>
+            <td class="p-3">${Number(row.lateDays) || 0}</td>
+            <td class="p-3">${(Number(row.avgMissedLateDays) || 0).toFixed(1)} min</td>
+            <td class="p-3 font-black text-blue-700">${Math.round(Number(row.potentialMissedPerStudent) || 0)} min</td>
+            <td class="p-3">${Number(row.highImpactDays) || 0}</td>
+            <td class="p-3 ${noCapture ? "font-black text-rose-600" : ""}">${noCapture}</td>`;
+
+        tbody.appendChild(tr);
+    });
+}
+
+function renderReportExceptions(exceptions) {
+    const container = document.getElementById("report-exception-list");
+    container.innerHTML = "";
+
+    if (!exceptions.length) {
+        container.innerHTML = '<span class="text-sm text-emerald-600 font-semibold">No unresolved arrival exceptions.</span>';
+        return;
+    }
+
+    exceptions.forEach(item => {
+        const badge = document.createElement("span");
+        badge.className = "bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs px-3 py-2 rounded-xl";
+        badge.innerText = `${item.route} — ${formatReportDate(item.date)}`;
+        container.appendChild(badge);
+    });
+}
+
+function formatPercent(value) {
+    return `${Math.round((Number(value) || 0) * 100)}%`;
+}
+
+function formatMinutesAsTime(minutes) {
+    if (minutes === null || minutes === undefined || !Number.isFinite(Number(minutes))) return "—";
+
+    let total = Math.round(Number(minutes));
+    total = ((total % 1440) + 1440) % 1440;
+
+    const hour24 = Math.floor(total / 60);
+    const minute = total % 60;
+    const hour12 = ((hour24 + 11) % 12) + 1;
+    const suffix = hour24 >= 12 ? "PM" : "AM";
+
+    return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+function formatReportDate(value) {
+    if (!value) return "—";
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return `${Number(match[2])}/${Number(match[3])}/${match[1]}`;
+
+    const parsed = new Date(value);
+    if (isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleDateString("en-US");
 }
 
 // ---------------------------------------------------------
