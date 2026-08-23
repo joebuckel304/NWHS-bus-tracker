@@ -229,10 +229,19 @@
             </div>
 
             <div>
-                <div class="flex items-center justify-between gap-4 mb-3">
+                <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-3">
                     <div>
                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">Selected Week</h3>
                         <p id="report-week-label" class="text-sm font-semibold text-slate-700 mt-1"></p>
+                    </div>
+                    <div class="flex flex-wrap items-end gap-2">
+                        <div>
+                            <label for="report-week-picker" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Choose Any Date in Week</label>
+                            <input type="date" id="report-week-picker" class="border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 touch-target">
+                        </div>
+                        <button onclick="applyReportWeek()" class="bg-slate-900 text-white font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-slate-800 transition-colors touch-target">View Week</button>
+                        <button onclick="shiftReportWeek(-7)" class="bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-xs px-3 py-2.5 rounded-xl hover:bg-slate-200 touch-target">← Previous</button>
+                        <button onclick="shiftReportWeek(7)" class="bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-xs px-3 py-2.5 rounded-xl hover:bg-slate-200 touch-target">Next →</button>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1002,6 +1011,7 @@ function updatePrincipalDashboardUI() {
 // ---------------------------------------------------------
 let reportsAuthorized = false;
 let reportRefreshTimer = null;
+let appSelectedReportWeek = "";
 
 function verifyReportsAccess() {
     const pin = document.getElementById("reports-pin").value;
@@ -1027,7 +1037,12 @@ function verifyReportsAccess() {
 function fetchReportData(showNotice) {
     if (!reportsAuthorized) return;
 
-    callGoogleScript({ action: "report" }, function(data) {
+    const reportParams = { action: "report" };
+    if (appSelectedReportWeek) {
+        reportParams.weekStart = appSelectedReportWeek;
+    }
+
+    callGoogleScript(reportParams, function(data) {
         if (!data || !data.reporting) {
             showToastNotification("⚠️ Reporting API not found. Update Apps Script with the reporting add-on.");
             return;
@@ -1067,6 +1082,12 @@ function renderReportsDashboard(reporting) {
         ? `Week of ${formatReportDate(reporting.selectedWeekStart)}`
         : "Selected reporting week";
 
+    if (reporting.selectedWeekStart) {
+        appSelectedReportWeek = reporting.selectedWeekStart;
+        const picker = document.getElementById("report-week-picker");
+        if (picker) picker.value = reporting.selectedWeekStart;
+    }
+
     renderReportBars(
         "report-ytd-impact-bars",
         ytd,
@@ -1093,6 +1114,62 @@ function renderReportsDashboard(reporting) {
 
     renderReportRouteTable(ytd);
     renderReportExceptions(exceptions);
+}
+
+function applyReportWeek() {
+    const picker = document.getElementById("report-week-picker");
+    if (!picker || !picker.value) {
+        showToastNotification("⚠️ Choose a date first.");
+        return;
+    }
+
+    appSelectedReportWeek = getMondayDateKey(picker.value);
+    fetchReportData(true);
+}
+
+function shiftReportWeek(days) {
+    let base = appSelectedReportWeek;
+
+    if (!base) {
+        const picker = document.getElementById("report-week-picker");
+        base = picker && picker.value ? picker.value : getMondayDateKey(new Date());
+    }
+
+    const parsed = parseLocalDateKey(base);
+    if (!parsed) return;
+
+    parsed.setDate(parsed.getDate() + days);
+    appSelectedReportWeek = getMondayDateKey(parsed);
+
+    const picker = document.getElementById("report-week-picker");
+    if (picker) picker.value = appSelectedReportWeek;
+
+    fetchReportData(true);
+}
+
+function getMondayDateKey(value) {
+    const date = value instanceof Date ? new Date(value.getFullYear(), value.getMonth(), value.getDate()) : parseLocalDateKey(value);
+    if (!date) return "";
+
+    const day = date.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    date.setDate(date.getDate() + diff);
+
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function parseLocalDateKey(value) {
+    if (!value) return null;
+
+    if (value instanceof Date && !isNaN(value.getTime())) {
+        return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+    }
+
+    const match = String(value).match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+    if (!match) return null;
+
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return isNaN(date.getTime()) ? null : date;
 }
 
 function summarizeReportRows(rows) {
