@@ -329,6 +329,7 @@ const LOCAL_PENDING_KEY = "bussync_pending_submissions";
 let pendingLocalSubmissions = [];
 const staffDrafts = new Map();
 const editingRoutes = new Set();
+const submissionsInFlight = new Set();
 
 // ---------------------------------------------------------
 // DATE + SESSION HELPERS
@@ -544,10 +545,10 @@ window.onload = function() {
     setInterval(refreshCloudData, 15000);
 };
 
-function callGoogleScript(params, callback) {
+function callGoogleScript(params, callback, errorCallback) {
     const queryString = new URLSearchParams(params).toString();
 
-    fetch(`${GOOGLE_SCRIPT_URL}?${queryString}`)
+    fetch(`${GOOGLE_SCRIPT_URL}?${queryString}`, { cache: "no-store" })
         .then(response => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response.json();
@@ -557,6 +558,7 @@ function callGoogleScript(params, callback) {
         })
         .catch(error => {
             console.error("Google Sheets Sync Error:", error);
+            if (errorCallback) errorCallback(error);
             showToastNotification("⚠️ Google Sheet sync error. Existing routes remain available.");
         });
 }
@@ -649,6 +651,7 @@ function switchTab(target) {
     document.getElementById("tab-reports").className = reports ? activeClass : inactiveClass;
 
     if (reports && reportsAuthorized) {
+        initializeCurrentReportWeek();
         fetchReportData(false);
     }
 }
@@ -780,6 +783,12 @@ function stampCurrentTime(idx) {
 }
 
 function submitBusRecord(routeId, idx) {
+    // Prevent double-clicks / overlapping submit requests for the same route.
+    if (submissionsInFlight.has(routeId)) {
+        showToastNotification(`${routeId} is already being saved. Please wait.`);
+        return;
+    }
+
     const timeField = document.getElementById(`time-${idx}`);
     const subField = document.getElementById(`sub-${idx}`);
     const notesField = document.getElementById(`notes-${idx}`);
@@ -790,6 +799,8 @@ function submitBusRecord(routeId, idx) {
         showToastNotification("⚠️ Please specify an arrival time before submitting.");
         return;
     }
+
+    submissionsInFlight.add(routeId);
 
     const now = new Date();
     const optimisticRecord = {
@@ -816,16 +827,21 @@ function submitBusRecord(routeId, idx) {
 
     callGoogleScript({
         action: "submit",
+        requestId: optimisticRecord.id,
         routeId,
         arrivalTime: optimisticRecord.arrivalTime,
         rawTime: optimisticRecord.rawTime,
         substitution: optimisticRecord.substitution,
         notes: optimisticRecord.notes
     }, function(data) {
+        submissionsInFlight.delete(routeId);
         applyCloudData(data);
         // Re-read the Sheet so dashboards across multiple devices receive the saved row.
         setTimeout(refreshCloudData, 750);
         showToastNotification(`Successfully logged ${routeId} to Google Sheet!`);
+    }, function() {
+        submissionsInFlight.delete(routeId);
+        showToastNotification(`⚠️ ${routeId} could not be saved. Please try again.`);
     });
 }
 
@@ -1018,11 +1034,25 @@ let reportsAuthorized = false;
 let reportRefreshTimer = null;
 let appSelectedReportWeek = "";
 
+function initializeCurrentReportWeek() {
+    // Default reporting to the current Monday-Sunday week when the dashboard
+    // is first opened. Once the user chooses another week, preserve that choice.
+    if (!appSelectedReportWeek) {
+        appSelectedReportWeek = getMondayDateKey(new Date());
+
+        const picker = document.getElementById("report-week-picker");
+        if (picker) {
+            picker.value = appSelectedReportWeek;
+        }
+    }
+}
+
 function verifyReportsAccess() {
     const pin = document.getElementById("reports-pin").value;
 
     if (pin === ADMIN_PIN) {
         reportsAuthorized = true;
+        initializeCurrentReportWeek();
         document.getElementById("reports-auth-error").classList.add("hidden");
         document.getElementById("reports-auth-wall").classList.add("hidden");
         document.getElementById("reports-dashboard-content").classList.remove("hidden");
