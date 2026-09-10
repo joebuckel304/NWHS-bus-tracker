@@ -889,6 +889,14 @@ function addCustomBus() {
         return;
     }
 
+    const confirmed = window.confirm(
+        "Are you SURE you'd like to create a new route? Please verify this vehicle is not a substitute bus."
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
     callGoogleScript({ action: "addRoute", routeId: route }, function(data) {
         const cloudRoutes = data && Array.isArray(data.routes)
             ? [...new Set(data.routes.map(item => String(item || "").trim()).filter(Boolean))]
