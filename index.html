@@ -90,16 +90,16 @@
                     <div id="kpi-total" class="text-2xl font-black text-slate-900 mt-1">0</div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold text-blue-500 uppercase tracking-wider">Pending Buses</div>
-                    <div id="kpi-pending" class="text-2xl font-black text-blue-600 mt-1">19</div>
+                    <div class="text-xs font-bold text-amber-500 uppercase tracking-wider">Pending Buses</div>
+                    <div id="kpi-pending" class="text-2xl font-black text-amber-600 mt-1">19</div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">On-Time Arrivals</div>
                     <div id="kpi-ontime" class="text-2xl font-black text-emerald-600 mt-1">0</div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold text-amber-500 uppercase tracking-wider">Substituted Buses</div>
-                    <div id="kpi-subs" class="text-2xl font-black text-amber-600 mt-1">0</div>
+                    <div class="text-xs font-bold text-blue-500 uppercase tracking-wider">Substituted Buses</div>
+                    <div id="kpi-subs" class="text-2xl font-black text-blue-600 mt-1">0</div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">Flagged Incidents / Notes</div>
@@ -120,6 +120,11 @@
                     <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3">Late Arrivals (Logged After 9:20 AM)</h3>
                     <div id="late-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-blue-200 shadow-sm">
+                <h3 class="text-xs font-bold text-blue-500 uppercase tracking-wider mb-3">Substitute Buses</h3>
+                <div id="substitute-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
             </div>
 
             <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
@@ -249,7 +254,7 @@
                         <button onclick="shiftReportWeek(7)" class="bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-xs px-3 py-2.5 rounded-xl hover:bg-slate-200 touch-target">Next →</button>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Arrivals Logged</div>
                         <div id="report-week-records" class="text-2xl font-black text-slate-900 mt-1">—</div>
@@ -257,6 +262,10 @@
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">On-Time Rate</div>
                         <div id="report-week-ontime" class="text-2xl font-black text-emerald-600 mt-1">—</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-blue-500 uppercase tracking-wider">Average Arrival Time</div>
+                        <div id="report-week-average" class="text-2xl font-black text-blue-600 mt-1">—</div>
                     </div>
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">No-Capture Flags</div>
@@ -974,10 +983,28 @@ function updatePrincipalDashboardUI() {
     } else {
         missingBuses.forEach(bus => {
             const badge = document.createElement("span");
-            badge.className = "bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
+            badge.className = "bg-amber-50 text-amber-700 border border-amber-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
             badge.innerText = bus;
             missingContainer.appendChild(badge);
         });
+    }
+
+    const substituteContainer = document.getElementById("substitute-buses-list");
+    if (substituteContainer) {
+        substituteContainer.innerHTML = "";
+        const substituteArrivals = currentSession.filter(item =>
+            item.substitution && item.substitution !== "None" && item.substitution !== "N/A"
+        );
+        if (substituteArrivals.length === 0) {
+            substituteContainer.innerHTML = '<span class="text-xs text-slate-500 font-medium italic py-1">No substitute buses recorded today.</span>';
+        } else {
+            substituteArrivals.forEach(log => {
+                const badge = document.createElement("span");
+                badge.className = "bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
+                badge.innerText = `${log.routeId} → ${log.substitution}`;
+                substituteContainer.appendChild(badge);
+            });
+        }
     }
 
     const lateContainer = document.getElementById("late-buses-list");
@@ -1128,6 +1155,7 @@ function renderReportsDashboard(reporting) {
 
     document.getElementById("report-week-records").innerText = weekSummary.records;
     document.getElementById("report-week-ontime").innerText = formatPercent(weekSummary.onTimePct);
+    document.getElementById("report-week-average").innerText = formatMinutesAsTime(weekSummary.avgArrivalMinutes);
     document.getElementById("report-week-exceptions").innerText = weekSummary.noCapture;
     document.getElementById("report-week-highimpact").innerText = weekSummary.highImpactDays;
 
