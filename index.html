@@ -90,16 +90,16 @@
                     <div id="kpi-total" class="text-2xl font-black text-slate-900 mt-1">0</div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold text-amber-500 uppercase tracking-wider">Pending Buses</div>
-                    <div id="kpi-pending" class="text-2xl font-black text-amber-600 mt-1">19</div>
+                    <div class="text-xs font-bold text-blue-500 uppercase tracking-wider">Pending Buses</div>
+                    <div id="kpi-pending" class="text-2xl font-black text-blue-600 mt-1">19</div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">On-Time Arrivals</div>
                     <div id="kpi-ontime" class="text-2xl font-black text-emerald-600 mt-1">0</div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold text-blue-500 uppercase tracking-wider">Substituted Buses</div>
-                    <div id="kpi-subs" class="text-2xl font-black text-blue-600 mt-1">0</div>
+                    <div class="text-xs font-bold text-amber-500 uppercase tracking-wider">Substituted Buses</div>
+                    <div id="kpi-subs" class="text-2xl font-black text-amber-600 mt-1">0</div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">Flagged Incidents / Notes</div>
@@ -113,18 +113,13 @@
                     <div id="missing-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 class="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-3">On-Time Arrivals (By 9:20 AM)</h3>
+                    <h3 class="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-3">On-Time Arrivals (By 9:25 AM)</h3>
                     <div id="ontime-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3">Late Arrivals (Logged After 9:20 AM)</h3>
+                    <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3">Late Arrivals (Logged After 9:25 AM)</h3>
                     <div id="late-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl border border-blue-200 shadow-sm">
-                <h3 class="text-xs font-bold text-blue-500 uppercase tracking-wider mb-3">Substitute Buses</h3>
-                <div id="substitute-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
             </div>
 
             <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
@@ -254,7 +249,7 @@
                         <button onclick="shiftReportWeek(7)" class="bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-xs px-3 py-2.5 rounded-xl hover:bg-slate-200 touch-target">Next →</button>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Arrivals Logged</div>
                         <div id="report-week-records" class="text-2xl font-black text-slate-900 mt-1">—</div>
@@ -262,10 +257,6 @@
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <div class="text-xs font-bold text-emerald-500 uppercase tracking-wider">On-Time Rate</div>
                         <div id="report-week-ontime" class="text-2xl font-black text-emerald-600 mt-1">—</div>
-                    </div>
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <div class="text-xs font-bold text-blue-500 uppercase tracking-wider">Average Arrival Time</div>
-                        <div id="report-week-average" class="text-2xl font-black text-blue-600 mt-1">—</div>
                     </div>
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <div class="text-xs font-bold text-rose-500 uppercase tracking-wider">No-Capture Flags</div>
@@ -413,7 +404,7 @@ function normalizeSheetTime(value) {
         // A time-only Google Sheets cell is serialized against the 1899 epoch in UTC.
         // For this Sheet, the returned value is consistently five hours ahead of the
         // intended school-local time. Convert that transport value back before using
-        // it for the Principal Portal display or the 9:20 AM late-arrival comparison.
+        // it for the Principal Portal display or the 9:25 AM late-arrival comparison.
         const utcMinutes = Number(sheetIso[1]) * 60 + Number(sheetIso[2]);
         const localMinutes = (utcMinutes - (5 * 60) + (24 * 60)) % (24 * 60);
         const h = Math.floor(localMinutes / 60);
@@ -898,14 +889,6 @@ function addCustomBus() {
         return;
     }
 
-    const confirmed = window.confirm(
-        "Are you SURE you'd like to create a new route? Please verify this vehicle is not a substitute bus."
-    );
-
-    if (!confirmed) {
-        return;
-    }
-
     callGoogleScript({ action: "addRoute", routeId: route }, function(data) {
         const cloudRoutes = data && Array.isArray(data.routes)
             ? [...new Set(data.routes.map(item => String(item || "").trim()).filter(Boolean))]
@@ -966,8 +949,8 @@ function updatePrincipalDashboardUI() {
     const currentSession = getCurrentSessionSubmissions();
     const loggedRouteIds = currentSession.map(item => item.routeId);
     const missingBuses = activeBuses.filter(bus => !loggedRouteIds.includes(bus));
-    const lateArrivals = currentSession.filter(item => item.rawTime && item.rawTime > "09:20");
-    const onTimeArrivals = currentSession.filter(item => item.rawTime && item.rawTime <= "09:20");
+    const lateArrivals = currentSession.filter(item => item.rawTime && item.rawTime > "09:25");
+    const onTimeArrivals = currentSession.filter(item => item.rawTime && item.rawTime <= "09:25");
     const onTimeCount = onTimeArrivals.length;
 
     document.getElementById("kpi-total").innerText = currentSession.length;
@@ -983,28 +966,10 @@ function updatePrincipalDashboardUI() {
     } else {
         missingBuses.forEach(bus => {
             const badge = document.createElement("span");
-            badge.className = "bg-amber-50 text-amber-700 border border-amber-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
+            badge.className = "bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
             badge.innerText = bus;
             missingContainer.appendChild(badge);
         });
-    }
-
-    const substituteContainer = document.getElementById("substitute-buses-list");
-    if (substituteContainer) {
-        substituteContainer.innerHTML = "";
-        const substituteArrivals = currentSession.filter(item =>
-            item.substitution && item.substitution !== "None" && item.substitution !== "N/A"
-        );
-        if (substituteArrivals.length === 0) {
-            substituteContainer.innerHTML = '<span class="text-xs text-slate-500 font-medium italic py-1">No substitute buses recorded today.</span>';
-        } else {
-            substituteArrivals.forEach(log => {
-                const badge = document.createElement("span");
-                badge.className = "bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
-                badge.innerText = `${log.routeId} → ${log.substitution}`;
-                substituteContainer.appendChild(badge);
-            });
-        }
     }
 
     const lateContainer = document.getElementById("late-buses-list");
@@ -1047,7 +1012,7 @@ function updatePrincipalDashboardUI() {
 
     [...submissionsLog].reverse().forEach(log => {
         const row = document.createElement("tr");
-        const isLate = log.rawTime && log.rawTime > "09:20";
+        const isLate = log.rawTime && log.rawTime > "09:25";
         row.className = `transition-colors border-b border-slate-100 ${isLate ? "bg-rose-50/20" : "hover:bg-slate-50"}`;
         row.innerHTML = `
             <td class="p-4 text-xs font-semibold text-slate-500 tabular-nums">${escapeHtml(formatDisplayDate(getRecordDateKey(log)))}</td>
@@ -1151,13 +1116,12 @@ function renderReportsDashboard(reporting) {
     document.getElementById("report-ytd-ontime").innerText = formatPercent(ytdSummary.onTimePct);
     document.getElementById("report-ytd-average").innerText = formatMinutesAsTime(ytdSummary.avgArrivalMinutes);
     document.getElementById("report-ytd-exceptions").innerText = ytdSummary.noCapture;
-    document.getElementById("report-ytd-highimpact").innerText = ytdSummary.highImpactDays;
+    document.getElementById("report-ytd-highimpact").innerText = Number(reporting.ytdHighImpactDays) || 0;
 
     document.getElementById("report-week-records").innerText = weekSummary.records;
     document.getElementById("report-week-ontime").innerText = formatPercent(weekSummary.onTimePct);
-    document.getElementById("report-week-average").innerText = formatMinutesAsTime(weekSummary.avgArrivalMinutes);
     document.getElementById("report-week-exceptions").innerText = weekSummary.noCapture;
-    document.getElementById("report-week-highimpact").innerText = weekSummary.highImpactDays;
+    document.getElementById("report-week-highimpact").innerText = Number(reporting.weeklyHighImpactDays) || 0;
 
     document.getElementById("report-week-label").innerText = reporting.selectedWeekStart
         ? `Week of ${formatReportDate(reporting.selectedWeekStart)}`
