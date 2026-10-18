@@ -366,6 +366,14 @@
           <p id="nw-fleet-message" role="status" class="text-sm text-slate-700"></p>
           <div id="nw-fleet-list" class="text-sm text-slate-500">Loading fleet…</div>
         </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
+          <h2 class="font-bold text-lg">Change Shared PIN</h2>
+          <p class="text-sm text-slate-500">One PIN protects all four tabs. Changing it signs out existing sessions.</p>
+          <input id="nw-pin-current" type="password" inputmode="numeric" autocomplete="off" placeholder="Current PIN" class="w-full border rounded-lg p-3" />
+          <input id="nw-pin-new" type="password" inputmode="numeric" autocomplete="off" placeholder="New PIN (4–12 digits)" class="w-full border rounded-lg p-3" />
+          <button onclick="NW_changePin()" class="bg-slate-900 text-white px-5 py-3 rounded-xl font-semibold">Change PIN</button>
+          <p id="nw-pin-message" role="status" class="text-sm text-slate-600"></p>
+        </div>
         <p id="nw-settings-message" role="status" class="text-sm text-slate-700"></p>
       </div>
     </section>
@@ -373,7 +381,41 @@
 </main>
 
 <script>
-const ADMIN_PIN = "5801";
+// PIN verification occurs exclusively in Google Apps Script. Never store a PIN here.
+let nwAuthToken = '';
+let nwClientId = crypto.randomUUID();
+const nwPending = new Map();
+function NW_api(action, params={}) {
+  return new Promise((resolve,reject)=>{
+    const requestId=crypto.randomUUID();
+    const iframe=document.createElement('iframe');
+    iframe.name='nw_secure_'+requestId;iframe.style.display='none';iframe.title='Secure background request';
+    const form=document.createElement('form');
+    form.method='POST';form.action=GOOGLE_SCRIPT_URL;form.target=iframe.name;form.style.display='none';
+    Object.entries({action,...params,token:nwAuthToken,clientId:nwClientId,requestId}).forEach(([key,value])=>{
+      const input=document.createElement('input');input.type='hidden';input.name=key;input.value=String(value??'');form.appendChild(input);
+    });
+    document.body.append(iframe,form);
+    const cleanup=()=>{nwPending.delete(requestId);form.remove();iframe.remove();};
+    const timer=setTimeout(()=>{cleanup();reject(new Error('Server request timed out. Check the Apps Script deployment.'));},35000);
+    nwPending.set(requestId,{resolve,reject,timer,cleanup});form.submit();
+  });
+}
+window.addEventListener('message',event=>{
+  if(!/^https:\/\/([a-z0-9-]+\.)*googleusercontent\.com$/.test(event.origin)&&event.origin!=='https://script.google.com')return;
+  const msg=event.data;
+  if(!msg||msg.type!=='NW_SECURE_REPLY'||!nwPending.has(msg.requestId))return;
+  const req=nwPending.get(msg.requestId);clearTimeout(req.timer);req.cleanup();
+  if(msg.result?.ok)req.resolve(msg.result.data);
+  else req.reject(new Error(msg.result?.error||'Request failed.'));
+});
+async function NW_authenticate(pin) {
+  const data=await NW_api('nwLogin',{pin});
+  nwAuthToken=data.token;
+  refreshCloudData();
+  return data;
+}
+
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsNy4XB-y0GbpHI-VRKvJuI7NubhBIaLD7QfE2ZXcfFytG53c6zxIuRCQov-1MJWhAjQ/exec";
 
 const DEFAULT_ROUTES = [
@@ -604,26 +646,17 @@ window.onload = function() {
         console.error("Dashboard initialization error:", error);
     }
 
-    refreshCloudData();
-    setInterval(refreshCloudData, 15000);
+    setInterval(()=>{if(nwAuthToken)refreshCloudData();},15000);
 };
 
 function callGoogleScript(params, callback, errorCallback) {
-    const queryString = new URLSearchParams(params).toString();
-
-    fetch(`${GOOGLE_SCRIPT_URL}?${queryString}`, { cache: "no-store" })
-        .then(response => {
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            return response.json();
-        })
-        .then(data => {
-            if (callback) callback(data);
-        })
-        .catch(error => {
-            console.error("Google Sheets Sync Error:", error);
-            if (errorCallback) errorCallback(error);
-            showToastNotification("⚠️ Google Sheet sync error. Existing routes remain available.");
-        });
+  if(!nwAuthToken){if(errorCallback)errorCallback(new Error('Please sign in.'));return;}
+  const {action,...fields}=params;
+  NW_api(action,fields).then(data=>{if(callback)callback(data);}).catch(error=>{
+    console.error('Northwest API error:',error);
+    if(errorCallback)errorCallback(error);
+    showToastNotification('⚠️ '+error.message);
+  });
 }
 
 function applyCloudData(data) {
@@ -952,36 +985,36 @@ function addCustomBus() { showToastNotification('Use Settings → Fleet Manageme
 // ---------------------------------------------------------
 // STAFF AUTHENTICATION
 // ---------------------------------------------------------
-function verifyStaffAccess() {
-    const pinField = document.getElementById("staff-pin");
-    const pin = pinField ? pinField.value : "";
-    if (pin === ADMIN_PIN) {
-        document.getElementById("staff-auth-error").classList.add("hidden");
-        document.getElementById("staff-auth-wall").classList.add("hidden");
-        document.getElementById("staff-logging-content").classList.remove("hidden");
-        renderStaffLoggingPanel();
-        showToastNotification("🔒 Staff access granted.");
-    } else {
-        document.getElementById("staff-auth-error").classList.remove("hidden");
-        if (pinField) pinField.value = "";
-    }
+async function verifyStaffAccess() {
+  const field=document.getElementById('staff-pin');
+  try {
+    await NW_authenticate(field.value);
+    field.value='';
+    document.getElementById('staff-auth-error').classList.add('hidden');
+    document.getElementById('staff-auth-wall').classList.add('hidden');
+    document.getElementById('staff-logging-content').classList.remove('hidden');
+    renderStaffLoggingPanel();showToastNotification('Staff access granted.');
+  } catch(error) {
+    document.getElementById('staff-auth-error').textContent=error.message;
+    document.getElementById('staff-auth-error').classList.remove('hidden');field.value='';
+  }
 }
 
 // ---------------------------------------------------------
 // ADMIN / DASHBOARD
 // ---------------------------------------------------------
-function verifyAdminAccess() {
-    const pin = document.getElementById("admin-pin").value;
-    if (pin === ADMIN_PIN) {
-        document.getElementById("auth-error").classList.add("hidden");
-        document.getElementById("principal-auth-wall").classList.add("hidden");
-        document.getElementById("principal-dashboard-content").classList.remove("hidden");
-        updatePrincipalDashboardUI();
-        showToastNotification("🔒 Access Granted. Live spreadsheet data loaded.");
-    } else {
-        document.getElementById("auth-error").classList.remove("hidden");
-        document.getElementById("admin-pin").value = "";
-    }
+async function verifyAdminAccess() {
+  const field=document.getElementById('admin-pin');
+  try {
+    await NW_authenticate(field.value);field.value='';
+    document.getElementById('auth-error').classList.add('hidden');
+    document.getElementById('principal-auth-wall').classList.add('hidden');
+    document.getElementById('principal-dashboard-content').classList.remove('hidden');
+    updatePrincipalDashboardUI();showToastNotification('Principal access granted.');
+  } catch(error) {
+    document.getElementById('auth-error').textContent=error.message;
+    document.getElementById('auth-error').classList.remove('hidden');field.value='';
+  }
 }
 
 function updatePrincipalDashboardUI() {
@@ -1111,26 +1144,20 @@ function initializeCurrentReportWeek() {
     }
 }
 
-function verifyReportsAccess() {
-    const pin = document.getElementById("reports-pin").value;
-
-    if (pin === ADMIN_PIN) {
-        reportsAuthorized = true;
-        initializeCurrentReportWeek();
-        document.getElementById("reports-auth-error").classList.add("hidden");
-        document.getElementById("reports-auth-wall").classList.add("hidden");
-        document.getElementById("reports-dashboard-content").classList.remove("hidden");
-        fetchReportData(true);
-
-        if (!reportRefreshTimer) {
-            reportRefreshTimer = setInterval(() => {
-                if (reportsAuthorized) fetchReportData(false);
-            }, 60000);
-        }
-    } else {
-        document.getElementById("reports-auth-error").classList.remove("hidden");
-        document.getElementById("reports-pin").value = "";
-    }
+async function verifyReportsAccess() {
+  const field=document.getElementById('reports-pin');
+  try {
+    await NW_authenticate(field.value);field.value='';
+    reportsAuthorized=true;initializeCurrentReportWeek();
+    document.getElementById('reports-auth-error').classList.add('hidden');
+    document.getElementById('reports-auth-wall').classList.add('hidden');
+    document.getElementById('reports-dashboard-content').classList.remove('hidden');
+    fetchReportData(true);
+    if(!reportRefreshTimer)reportRefreshTimer=setInterval(()=>{if(reportsAuthorized&&nwAuthToken)fetchReportData(false);},60000);
+  } catch(error) {
+    document.getElementById('reports-auth-error').textContent=error.message;
+    document.getElementById('reports-auth-error').classList.remove('hidden');field.value='';
+  }
 }
 
 function fetchReportData(showNotice) {
@@ -1554,36 +1581,26 @@ function NW_fmtTime(s) {
   const [h,m]=String(s||'09:20').split(':').map(Number);
   return ((h%12)||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM');
 }
-function NW_openSettings() {
-  const pin=document.getElementById('nw-settings-pin').value;
+async function NW_openSettings() {
+  const field=document.getElementById('nw-settings-pin');
   const msg=document.getElementById('nw-settings-auth-msg');
-  if(!/^\d{4,12}$/.test(pin)){msg.textContent='Enter the administrator PIN.';return;}
-  if (pin !== ADMIN_PIN) { msg.textContent="Incorrect PIN."; return; }
-  // Northwest uses the same PIN for all four tabs; backend verifies settings writes.
-  nwSettingsPin=pin;
-  document.getElementById('nw-settings-auth').classList.add('hidden');
-  document.getElementById('nw-settings-content').classList.remove('hidden');
-  msg.textContent='';
-  NW_loadHistory();
-  NW_loadFleet();
+  try {
+    await NW_authenticate(field.value);field.value='';
+    document.getElementById('nw-settings-auth').classList.add('hidden');
+    document.getElementById('nw-settings-content').classList.remove('hidden');
+    msg.textContent='';NW_loadHistory();NW_loadFleet();
+  } catch(error){msg.textContent=error.message;field.value='';}
 }
 async function NW_sendSettings(payload,check) {
   const msg=document.getElementById('nw-settings-message');
   msg.textContent='Saving to Google Sheets…';
   try {
-    const body=new URLSearchParams({...payload,action:'nwSaveSettings',pin:nwSettingsPin});
-    await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',body});
-    // The POST is opaque. A fresh read confirms whether the setting actually changed.
-    await new Promise(resolve=>setTimeout(resolve,1800));
-    const res=await fetch(GOOGLE_SCRIPT_URL+'?action=read&_='+Date.now(),{cache:'no-store'});
-    if(!res.ok) throw new Error('Could not confirm the saved setting.');
-    const data=await res.json();
-    if(!data.trackerSettings || !(await check(data.trackerSettings))) throw new Error('Setting not confirmed. Check the server-side Settings PIN configuration and try again.');
+    await NW_api('nwSaveSettings',payload);
+    const data=await NW_api('read');
+    if(!data.trackerSettings || !(await check(data.trackerSettings)))throw new Error('Settings did not match the saved values.');
     NW_applySettings(data.trackerSettings);
-    msg.textContent='Saved successfully.';
-    NW_loadHistory();
-    showToastNotification('Settings saved.');
-  } catch(e) {msg.textContent='Could not verify save: '+e.message;}
+    msg.textContent='Saved successfully.';NW_loadHistory();showToastNotification('Settings saved.');
+  }catch(error){msg.textContent='Could not save: '+error.message;}
 }
 function NW_saveThresholds() {
   const onTime=document.getElementById('nw-on-time').value;
@@ -1598,9 +1615,7 @@ function NW_saveSchedule() {
   const notes=document.getElementById('nw-schedule-notes').value;
   if(!date){document.getElementById('nw-settings-message').textContent='Select a date.';return;}
   NW_sendSettings({mode:'schedule',date,status,notes},async s=>{
-    const r=await fetch(GOOGLE_SCRIPT_URL+'?action=nwScheduleLookup&date='+encodeURIComponent(date)+'&_='+Date.now(),{cache:'no-store'});
-    if(!r.ok) return false;
-    const v=await r.json();
+    const v=await NW_api('nwScheduleLookup',{date});
     return v.status===status && v.notes===notes;
   });
 }
@@ -1609,10 +1624,8 @@ function NW_saveSchedule() {
 
 // School-year schedule history and non-destructive fleet administration.
 async function NW_readExtension(action) {
-  const r=await fetch(GOOGLE_SCRIPT_URL+'?action='+encodeURIComponent(action)+'&_='+Date.now(),{cache:'no-store'});
-  if(!r.ok) throw new Error('Could not read Google Sheets ('+r.status+').');
-  const data=await r.json();
-  if(!data.success) throw new Error(data.error||'Request failed.');
+  const data=await NW_api(action);
+  if(!data.success)throw new Error(data.error||'Request failed.');
   return data;
 }
 async function NW_loadHistory() {
@@ -1627,9 +1640,7 @@ async function NW_loadHistory() {
 async function NW_editHistoryDate(date) {
   document.getElementById('nw-schedule-date').value=date;
   try {
-    const r=await fetch(GOOGLE_SCRIPT_URL+'?action=nwScheduleLookup&date='+encodeURIComponent(date)+'&_='+Date.now(),{cache:'no-store'});
-    if(!r.ok)throw new Error('Unable to load date.');
-    const x=await r.json();
+    const x=await NW_api('nwScheduleLookup',{date});
     document.getElementById('nw-schedule-status').value=x.status||'Normal Day';
     document.getElementById('nw-schedule-notes').value=x.notes||'';
     document.getElementById('nw-schedule-date').scrollIntoView({behavior:'smooth',block:'center'});
@@ -1659,8 +1670,7 @@ async function NW_saveFleet() {
   if(!window.confirm(descriptions[mode]+'\n\nThis may affect future and historical reporting displays. No historical submissions will be deleted or rewritten.\n\nContinue?'))return;
   msg.textContent='Saving fleet change…';
   try {
-    await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',body:new URLSearchParams({action:'nwManageFleet',mode,route,newRoute:normalizedNew,pin:nwSettingsPin})});
-    await new Promise(resolve=>setTimeout(resolve,1800));
+    await NW_api('nwManageFleet',{mode,route,newRoute:normalizedNew});
     const fleet=(await NW_readExtension('nwFleetList')).fleet;
     const status=id=>fleet.find(x=>x.route===id)?.status;
     const okay=(mode==='add'||mode==='reactivate')?status(route)==='Active':mode==='deactivate'?status(route)==='Inactive':status(route)==='Inactive'&&status(normalizedNew)==='Active';
@@ -1670,6 +1680,20 @@ async function NW_saveFleet() {
     refreshCloudData();
     showToastNotification('Fleet updated. Historical arrivals preserved.');
   }catch(e){msg.textContent='Fleet change not confirmed: '+e.message;}
+}
+
+async function NW_changePin(){
+  const msg=document.getElementById('nw-pin-message');
+  const currentPin=document.getElementById('nw-pin-current').value;
+  const newPin=document.getElementById('nw-pin-new').value;
+  if(!/^\d{4,12}$/.test(newPin)){msg.textContent='New PIN must be 4–12 digits.';return;}
+  if(!confirm('Change the shared PIN for all four tabs? Existing sessions will expire.'))return;
+  try{
+    await NW_api('nwChangePin',{currentPin,newPin});
+    document.getElementById('nw-pin-current').value='';document.getElementById('nw-pin-new').value='';
+    nwAuthToken='';msg.textContent='PIN changed. Refresh the website and sign in with the new PIN.';
+    showToastNotification('PIN changed. Refresh to sign in again.');
+  }catch(error){msg.textContent=error.message;}
 }
 
 </script>
