@@ -182,7 +182,7 @@
             <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h2 class="text-xl font-bold text-slate-900">Instructional Impact Reporting</h2>
-                    <p class="text-sm text-slate-500 mt-0.5">9:20 AM on-time threshold · Delay/Closure dates excluded · Arrival Not Captured flagged separately.</p>
+                    <p class="text-sm text-slate-500 mt-0.5">Scheduled delays are included after normalization · School closures excluded · Arrival Not Captured flagged separately.</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <span id="report-generated-at" class="text-xs text-slate-400 font-medium"></span>
@@ -195,6 +195,7 @@
                     <div>
                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">School Year-to-Date Snapshot</h3>
                         <p id="report-school-year-label" class="text-sm font-semibold text-slate-700 mt-1">Current School Year</p>
+                        <p class="text-xs text-slate-500 mt-1">Arrival averages and on-time rates use regular-schedule-equivalent times on delayed days.</p>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -226,7 +227,7 @@
                     <div class="flex items-start justify-between gap-4 mb-4">
                         <div>
                             <h3 class="font-bold text-slate-900">School Year-to-Date Potential Instructional Minutes Missed</h3>
-                            <p class="text-xs text-slate-500 mt-1">Per student, ranked by route. No-capture flags are not assigned minutes.</p>
+                            <p class="text-xs text-slate-500 mt-1">Per student, ranked by route. Delayed days are normalized; no-capture flags are not assigned minutes.</p>
                         </div>
                     </div>
                     <div id="report-ytd-impact-bars" class="space-y-3"></div>
@@ -235,7 +236,7 @@
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="mb-4">
                         <h3 class="font-bold text-slate-900">School Year-to-Date On-Time Performance</h3>
-                        <p class="text-xs text-slate-500 mt-1">Percentage of captured arrivals arriving by 9:20 AM.</p>
+                        <p class="text-xs text-slate-500 mt-1">Percentage of captured arrivals meeting the regular-day cutoff; scheduled delays are normalized.</p>
                     </div>
                     <div id="report-ytd-ontime-bars" class="space-y-3"></div>
                 </div>
@@ -246,6 +247,7 @@
                     <div>
                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">Selected Week</h3>
                         <p id="report-week-label" class="text-sm font-semibold text-slate-700 mt-1"></p>
+                        <div id="report-delay-disclosure" class="hidden mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900"></div>
                     </div>
                     <div class="flex flex-wrap items-end gap-2">
                         <div>
@@ -1211,6 +1213,28 @@ function renderReportsDashboard(reporting) {
         if (picker) picker.value = reporting.selectedWeekStart;
     }
 
+    const delayDisclosure = document.getElementById('report-delay-disclosure');
+    if (delayDisclosure) {
+      const weekStart = reporting.selectedWeekStart || '';
+      const start = weekStart ? new Date(weekStart + 'T12:00:00') : null;
+      const end = start ? new Date(start.getTime() + 7 * 86400000) : null;
+      const inWeek = (Array.isArray(reporting.delayedDays) ? reporting.delayedDays : []).filter(item => {
+        const d = new Date(item.date + 'T12:00:00');
+        return start && d >= start && d < end;
+      });
+      if (inWeek.length) {
+        const lines = inWeek.map(item => formatReportDate(item.date) + ': ' + item.status + ' (−' + item.delayMinutes + ' minutes)');
+        delayDisclosure.replaceChildren();
+        const strong = document.createElement('strong');
+        strong.textContent = 'Schedule adjustment applied: ';
+        delayDisclosure.append(strong, document.createTextNode(lines.join('; ') + '. Arrival times shown in reports and graphs have been converted to their normal-day equivalents. Actual timestamps remain unchanged in Google Sheets.'));
+        delayDisclosure.classList.remove('hidden');
+      } else {
+        delayDisclosure.textContent = '';
+        delayDisclosure.classList.add('hidden');
+      }
+    }
+
     renderReportBars(
         "report-ytd-impact-bars",
         ytd,
@@ -1521,15 +1545,23 @@ function NW_applySettings(s) {
     const closed = s.dayStatus === 'School Closure';
     const delay = String(s.dayStatus || '').includes('Delay');
     banner.className = 'rounded-xl border px-5 py-4 text-sm font-semibold ' + (closed?'bg-rose-50 border-rose-200 text-rose-800':delay?'bg-amber-50 border-amber-200 text-amber-900':'bg-blue-50 border-blue-200 text-blue-900');
-    banner.textContent = 'Today’s Schedule: ' + (s.dayStatus || 'Normal Day') + (s.dayNotes ? ' — ' + s.dayNotes : '') + ' · On-time cutoff ' + NW_fmtTime(s.onTime || '09:20');
+    const delayHours = ({'1-Hour Delay':1,'2-Hour Delay':2,'3-Hour Delay':3})[s.dayStatus] || 0;
+    const cutoffBase = s.onTime || '09:20';
+    const cutoffAdjusted = NW_addHours(cutoffBase, delayHours);
+    banner.textContent = 'Today’s Schedule: ' + (s.dayStatus || 'Normal Day') + (s.dayNotes ? ' — ' + s.dayNotes : '') + (closed ? ' · No bus arrival cutoff (school closed)' : ' · On-time cutoff ' + NW_fmtTime(cutoffAdjusted) + (delayHours ? ' (regular cutoff ' + NW_fmtTime(cutoffBase) + ')' : ''));
   }
-  document.querySelectorAll('.nw-cutoff-label').forEach(el=>el.textContent=NW_fmtTime(s.onTime||'09:20'));
+  document.querySelectorAll('.nw-cutoff-label').forEach(el=>el.textContent=s.dayStatus==='School Closure'?'School Closed':NW_fmtTime(NW_addHours(s.onTime||'09:20',({'1-Hour Delay':1,'2-Hour Delay':2,'3-Hour Delay':3})[s.dayStatus]||0)));
   for (const [id,val] of [['nw-on-time',s.onTime],['nw-first-period',s.firstPeriod],['nw-high-impact',s.highImpact]]) {
     const input=document.getElementById(id);if(input && document.activeElement!==input) input.value=val||'';
   }
   const date=document.getElementById('nw-schedule-date');if(date&&!date.value) date.value=s.date||'';
   const status=document.getElementById('nw-schedule-status');
   if(status && date && date.value===s.date && ['Normal Day','1-Hour Delay','2-Hour Delay','3-Hour Delay','School Closure'].includes(s.dayStatus)) status.value=s.dayStatus;
+}
+function NW_addHours(s, hours) {
+  const parts = String(s || '09:20').split(':').map(Number);
+  const minutes = ((parts[0] * 60 + parts[1] + hours * 60) % 1440 + 1440) % 1440;
+  return String(Math.floor(minutes / 60)).padStart(2,'0') + ':' + String(minutes % 60).padStart(2,'0');
 }
 function NW_fmtTime(s) {
   const [h,m]=String(s||'09:20').split(':').map(Number);
