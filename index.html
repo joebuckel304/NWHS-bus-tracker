@@ -34,13 +34,15 @@
         <span id="toast-message" class="text-sm font-medium"></span>
     </div>
 
-    <div class="flex bg-slate-200/80 p-1 rounded-xl max-w-2xl w-full border border-slate-300/50 shadow-inner">
+    <div class="flex bg-slate-200/80 p-1 rounded-xl max-w-3xl w-full border border-slate-300/50 shadow-inner">
         <button id="tab-logging" onclick="switchTab('logging')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target">Staff Logging Panel</button>
         <button id="tab-review" onclick="switchTab('review')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target">Principal Portal</button>
         <button id="tab-reports" onclick="switchTab('reports')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target">Reports</button>
+        <button id="tab-settings" onclick="switchTab('settings')" class="flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target">Settings</button>
     </div>
 
     <section id="view-logging" class="space-y-6">
+        <div id="nw-day-banner" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-900">Today's Schedule: Loading…</div>
         <div id="staff-auth-wall" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-xl text-center space-y-5 my-8">
             <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">🔒</div>
             <div>
@@ -113,11 +115,11 @@
                     <div id="missing-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 class="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-3">On-Time Arrivals (By 9:20 AM)</h3>
+                    <h3 class="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-3">On-Time Arrivals (By <span class="nw-cutoff-label">9:20 AM</span>)</h3>
                     <div id="ontime-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3">Late Arrivals (Logged After 9:20 AM)</h3>
+                    <h3 class="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3">Late Arrivals (After <span class="nw-cutoff-label">9:20 AM</span>)</h3>
                     <div id="late-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
                 </div>
             </div>
@@ -175,6 +177,7 @@
             <button onclick="verifyReportsAccess()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800 transition-colors shadow-md touch-target">Authorize & View Reports</button>
         </div>
 
+        <p class="text-xs text-slate-500">Scheduled delays are normalized in reporting; original timestamps are preserved.</p>
         <div id="reports-dashboard-content" class="hidden space-y-6">
             <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -318,6 +321,39 @@
         </div>
     </section>
 
+    <section id="view-settings" class="hidden space-y-5">
+      <div id="nw-settings-auth" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-lg space-y-4">
+        <h2 class="text-lg font-bold">Settings Access</h2>
+        <p class="text-sm text-slate-600">Enter the same PIN used for Staff Logging, Principal Portal, and Reports.</p>
+        <input id="nw-settings-pin" type="password" autocomplete="off" placeholder="Administrator PIN" class="w-full border border-slate-300 rounded-xl p-3" />
+        <button onclick="NW_openSettings()" class="bg-slate-900 text-white rounded-xl p-3 w-full font-semibold">Authorize Settings</button>
+        <p id="nw-settings-auth-msg" class="text-sm text-rose-600" role="status"></p>
+      </div>
+      <div id="nw-settings-content" class="hidden space-y-5">
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <h2 class="font-bold text-lg">Arrival and reporting thresholds</h2>
+          <p class="text-sm text-slate-500">Northwest's normal on-time cutoff is 9:20 AM. Changes affect reporting calculations and the principal dashboard.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <label class="text-sm font-semibold">On-time cutoff<input id="nw-on-time" type="time" class="mt-2 w-full border rounded-lg p-3" /></label>
+            <label class="text-sm font-semibold">First period begins<input id="nw-first-period" type="time" class="mt-2 w-full border rounded-lg p-3" /></label>
+            <label class="text-sm font-semibold">High-impact begins<input id="nw-high-impact" type="time" class="mt-2 w-full border rounded-lg p-3" /></label>
+          </div>
+          <button onclick="NW_saveThresholds()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold">Save Thresholds</button>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <h2 class="font-bold text-lg">School day status</h2>
+          <p class="text-sm text-slate-500">Scheduled delays are normalized to regular-day arrival times in reports; closures are excluded. Actual times remain unchanged in the log.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="text-sm font-semibold">School date<input id="nw-schedule-date" type="date" class="mt-2 w-full border rounded-lg p-3" /></label>
+            <label class="text-sm font-semibold">Schedule<select id="nw-schedule-status" class="mt-2 w-full border rounded-lg p-3"><option>Normal Day</option><option>1-Hour Delay</option><option>2-Hour Delay</option><option>3-Hour Delay</option><option>School Closure</option></select></label>
+          </div>
+          <label class="block text-sm font-semibold">Notes (optional)<input id="nw-schedule-notes" maxlength="500" class="mt-2 w-full border rounded-lg p-3" placeholder="Reason for delay or closure" /></label>
+          <button onclick="NW_saveSchedule()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold">Save Day Status</button>
+        </div>
+        <p id="nw-settings-message" role="status" class="text-sm text-slate-700"></p>
+      </div>
+    </section>
+
 </main>
 
 <script>
@@ -332,6 +368,8 @@ const DEFAULT_ROUTES = [
 ];
 
 let activeBuses = [...DEFAULT_ROUTES];
+let nwSettings = {onTime:"09:20",firstPeriod:"09:25",highImpact:"09:35",dayStatus:"Normal Day",dayNotes:""};
+let nwSettingsPin = "";
 let submissionsLog = [];
 const SESSION_RESET_KEY = "bussync_session_reset_cutoff";
 const LOCAL_PENDING_KEY = "bussync_pending_submissions";
@@ -618,6 +656,7 @@ function applyCloudData(data) {
         activeBuses = [...DEFAULT_ROUTES];
     }
 
+    if (data.trackerSettings) NW_applySettings(data.trackerSettings);
     renderStaffLoggingPanel();
     updatePrincipalDashboardUI();
 }
@@ -647,10 +686,12 @@ function switchTab(target) {
     const logging = target === "logging";
     const review = target === "review";
     const reports = target === "reports";
+    const settings = target === "settings";
 
     document.getElementById("view-logging").classList.toggle("hidden", !logging);
     document.getElementById("view-review").classList.toggle("hidden", !review);
     document.getElementById("view-reports").classList.toggle("hidden", !reports);
+    document.getElementById("view-settings").classList.toggle("hidden", !settings);
 
     const activeClass = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold bg-white text-blue-600 shadow-sm touch-target";
     const inactiveClass = "flex-1 text-center py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 touch-target";
@@ -658,6 +699,7 @@ function switchTab(target) {
     document.getElementById("tab-logging").className = logging ? activeClass : inactiveClass;
     document.getElementById("tab-review").className = review ? activeClass : inactiveClass;
     document.getElementById("tab-reports").className = reports ? activeClass : inactiveClass;
+    document.getElementById("tab-settings").className = settings ? activeClass : inactiveClass;
 
     if (reports && reportsAuthorized) {
         initializeCurrentReportWeek();
@@ -966,8 +1008,8 @@ function updatePrincipalDashboardUI() {
     const currentSession = getCurrentSessionSubmissions();
     const loggedRouteIds = currentSession.map(item => item.routeId);
     const missingBuses = activeBuses.filter(bus => !loggedRouteIds.includes(bus));
-    const lateArrivals = currentSession.filter(item => item.rawTime && item.rawTime > "09:20");
-    const onTimeArrivals = currentSession.filter(item => item.rawTime && item.rawTime <= "09:20");
+    const lateArrivals = currentSession.filter(item => item.rawTime && item.rawTime > nwSettings.onTime);
+    const onTimeArrivals = currentSession.filter(item => item.rawTime && item.rawTime <= nwSettings.onTime);
     const onTimeCount = onTimeArrivals.length;
 
     document.getElementById("kpi-total").innerText = currentSession.length;
@@ -1047,7 +1089,7 @@ function updatePrincipalDashboardUI() {
 
     [...submissionsLog].reverse().forEach(log => {
         const row = document.createElement("tr");
-        const isLate = log.rawTime && log.rawTime > "09:20";
+        const isLate = log.rawTime && log.rawTime > nwSettings.onTime;
         row.className = `transition-colors border-b border-slate-100 ${isLate ? "bg-rose-50/20" : "hover:bg-slate-50"}`;
         row.innerHTML = `
             <td class="p-4 text-xs font-semibold text-slate-500 tabular-nums">${escapeHtml(formatDisplayDate(getRecordDateKey(log)))}</td>
@@ -1467,6 +1509,81 @@ function escapeJs(value) {
         .replace(/\\/g, "\\\\")
         .replace(/'/g, "\\'");
 }
+
+
+// Northwest school settings - settings updates are POSTed to Apps Script.
+// Cross-origin Apps Script redirects prevent reading POST responses in this context;
+// confirm persistence through a subsequent read before showing success.
+function NW_applySettings(s) {
+  nwSettings = Object.assign({},nwSettings,s);
+  const banner = document.getElementById('nw-day-banner');
+  if (banner) {
+    const closed = s.dayStatus === 'School Closure';
+    const delay = String(s.dayStatus || '').includes('Delay');
+    banner.className = 'rounded-xl border px-5 py-4 text-sm font-semibold ' + (closed?'bg-rose-50 border-rose-200 text-rose-800':delay?'bg-amber-50 border-amber-200 text-amber-900':'bg-blue-50 border-blue-200 text-blue-900');
+    banner.textContent = 'Today’s Schedule: ' + (s.dayStatus || 'Normal Day') + (s.dayNotes ? ' — ' + s.dayNotes : '') + ' · On-time cutoff ' + NW_fmtTime(s.onTime || '09:20');
+  }
+  document.querySelectorAll('.nw-cutoff-label').forEach(el=>el.textContent=NW_fmtTime(s.onTime||'09:20'));
+  for (const [id,val] of [['nw-on-time',s.onTime],['nw-first-period',s.firstPeriod],['nw-high-impact',s.highImpact]]) {
+    const input=document.getElementById(id);if(input && document.activeElement!==input) input.value=val||'';
+  }
+  const date=document.getElementById('nw-schedule-date');if(date&&!date.value) date.value=s.date||'';
+  const status=document.getElementById('nw-schedule-status');
+  if(status && date && date.value===s.date && ['Normal Day','1-Hour Delay','2-Hour Delay','3-Hour Delay','School Closure'].includes(s.dayStatus)) status.value=s.dayStatus;
+}
+function NW_fmtTime(s) {
+  const [h,m]=String(s||'09:20').split(':').map(Number);
+  return ((h%12)||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM');
+}
+function NW_openSettings() {
+  const pin=document.getElementById('nw-settings-pin').value;
+  const msg=document.getElementById('nw-settings-auth-msg');
+  if(!/^\d{4,12}$/.test(pin)){msg.textContent='Enter the administrator PIN.';return;}
+  if (pin !== ADMIN_PIN) { msg.textContent="Incorrect PIN."; return; }
+  // Northwest uses the same PIN for all four tabs; backend verifies settings writes.
+  nwSettingsPin=pin;
+  document.getElementById('nw-settings-auth').classList.add('hidden');
+  document.getElementById('nw-settings-content').classList.remove('hidden');
+  msg.textContent='';
+}
+async function NW_sendSettings(payload,check) {
+  const msg=document.getElementById('nw-settings-message');
+  msg.textContent='Saving to Google Sheets…';
+  try {
+    const body=new URLSearchParams({...payload,action:'nwSaveSettings',pin:nwSettingsPin});
+    await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',body});
+    // The POST is opaque. A fresh read confirms whether the setting actually changed.
+    await new Promise(resolve=>setTimeout(resolve,1800));
+    const res=await fetch(GOOGLE_SCRIPT_URL+'?action=read&_='+Date.now(),{cache:'no-store'});
+    if(!res.ok) throw new Error('Could not confirm the saved setting.');
+    const data=await res.json();
+    if(!data.trackerSettings || !(await check(data.trackerSettings))) throw new Error('Setting not confirmed. Check the server-side Settings PIN configuration and try again.');
+    NW_applySettings(data.trackerSettings);
+    msg.textContent='Saved successfully.';
+    showToastNotification('Settings saved.');
+  } catch(e) {msg.textContent='Could not verify save: '+e.message;}
+}
+function NW_saveThresholds() {
+  const onTime=document.getElementById('nw-on-time').value;
+  const firstPeriod=document.getElementById('nw-first-period').value;
+  const highImpact=document.getElementById('nw-high-impact').value;
+  if(!onTime||!firstPeriod||!highImpact||!(onTime<=firstPeriod&&firstPeriod<=highImpact)) {document.getElementById('nw-settings-message').textContent='Enter valid thresholds in chronological order.';return;}
+  NW_sendSettings({mode:'thresholds',onTime,firstPeriod,highImpact},s=>s.onTime===onTime&&s.firstPeriod===firstPeriod&&s.highImpact===highImpact);
+}
+function NW_saveSchedule() {
+  const date=document.getElementById('nw-schedule-date').value;
+  const status=document.getElementById('nw-schedule-status').value;
+  const notes=document.getElementById('nw-schedule-notes').value;
+  if(!date){document.getElementById('nw-settings-message').textContent='Select a date.';return;}
+  NW_sendSettings({mode:'schedule',date,status,notes},async s=>{
+    const r=await fetch(GOOGLE_SCRIPT_URL+'?action=nwScheduleLookup&date='+encodeURIComponent(date)+'&_='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return false;
+    const v=await r.json();
+    return v.status===status && v.notes===notes;
+  });
+}
+
+
 </script>
 </body>
 </html>
