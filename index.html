@@ -62,10 +62,7 @@
                 <h2 class="text-xl font-bold text-slate-900">Active Bus Check-In</h2>
                 <p class="text-sm text-slate-500 mt-0.5">Select a bus route below to log arrival records instantly.</p>
             </div>
-            <div class="flex items-center space-x-2">
-                <input type="text" id="new-bus-number" placeholder="Add custom route #..." class="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40 touch-target font-medium">
-                <button onclick="addCustomBus()" class="bg-blue-600 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm touch-target">+ Add</button>
-            </div>
+            <p class="text-xs text-slate-500">Routes are managed in Settings → Fleet Management.</p>
         </div>
         <div id="bus-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </div>
@@ -351,6 +348,23 @@
           </div>
           <label class="block text-sm font-semibold">Notes (optional)<input id="nw-schedule-notes" maxlength="500" class="mt-2 w-full border rounded-lg p-3" placeholder="Reason for delay or closure" /></label>
           <button onclick="NW_saveSchedule()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold">Save Day Status</button>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between gap-3 flex-wrap"><div><h2 class="font-bold text-lg">School Day History</h2><p class="text-sm text-slate-500">Recorded delays and closures for the current school year, directly from Google Sheets.</p></div><button onclick="NW_loadHistory()" class="px-4 py-2 border rounded-lg text-sm font-semibold">Refresh History</button></div>
+          <div id="nw-history-list" class="text-sm text-slate-500">Loading schedule history…</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between gap-3 flex-wrap"><div><h2 class="font-bold text-lg">Fleet Management</h2><p class="text-sm text-slate-500">Add, retire, reactivate, or replace routes. Original records are never rewritten.</p></div><button onclick="NW_loadFleet()" class="px-4 py-2 border rounded-lg text-sm font-semibold">Refresh Fleet</button></div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label class="text-sm font-semibold">Action<select id="nw-fleet-action" class="mt-2 w-full border rounded-lg p-3" onchange="NW_fleetActionChanged()"><option value="add">Add new route</option><option value="deactivate">Deactivate route</option><option value="reactivate">Reactivate route</option><option value="replace">Replace / renumber route</option></select></label>
+            <label class="text-sm font-semibold">Route ID<input id="nw-fleet-route" class="mt-2 w-full border rounded-lg p-3" placeholder="Bus 611" maxlength="29" list="nw-route-options" /></label>
+            <label id="nw-fleet-new-wrap" class="text-sm font-semibold hidden">New route ID<input id="nw-fleet-new" class="mt-2 w-full border rounded-lg p-3" placeholder="Bus 999" maxlength="29" /></label>
+            <datalist id="nw-route-options"></datalist>
+          </div>
+          <div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm"><strong>Historical reporting warning:</strong> Fleet changes affect future check-ins and may change which routes appear in reports. Replacing a route creates a new report card for the new ID; the old route keeps its historical report card. No past arrivals will be changed.</div>
+          <button onclick="NW_saveFleet()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold">Review &amp; Confirm Fleet Change</button>
+          <p id="nw-fleet-message" role="status" class="text-sm text-slate-700"></p>
+          <div id="nw-fleet-list" class="text-sm text-slate-500">Loading fleet…</div>
         </div>
         <p id="nw-settings-message" role="status" class="text-sm text-slate-700"></p>
       </div>
@@ -933,43 +947,7 @@ function undoSubmission(routeId) {
     });
 }
 
-function addCustomBus() {
-    const input = document.getElementById("new-bus-number");
-    const route = input.value.trim();
-    if (!route) return;
-    if (activeBuses.includes(route)) {
-        showToastNotification("⚠️ This route ID is already registered.");
-        return;
-    }
-
-    const confirmed = window.confirm(
-        "Are you SURE you'd like to create a new route? Please verify this vehicle is not a substitute bus."
-    );
-
-    if (!confirmed) {
-        return;
-    }
-
-    callGoogleScript({ action: "addRoute", routeId: route }, function(data) {
-        const cloudRoutes = data && Array.isArray(data.routes)
-            ? [...new Set(data.routes.map(item => String(item || "").trim()).filter(Boolean))]
-            : [];
-
-        // Prefer the Sheet's returned list. If the response does not include routes,
-        // append the new route locally until the next successful cloud refresh.
-        activeBuses = cloudRoutes.length
-            ? cloudRoutes
-            : [...new Set([...activeBuses, route])];
-
-        if (data) applyCloudData({ ...data, routes: activeBuses });
-        else {
-            renderStaffLoggingPanel();
-            updatePrincipalDashboardUI();
-        }
-        showToastNotification(`Route "${route}" added.`);
-    });
-    input.value = "";
-}
+function addCustomBus() { showToastNotification('Use Settings → Fleet Management to add routes.'); }
 
 // ---------------------------------------------------------
 // STAFF AUTHENTICATION
@@ -1577,6 +1555,8 @@ function NW_openSettings() {
   document.getElementById('nw-settings-auth').classList.add('hidden');
   document.getElementById('nw-settings-content').classList.remove('hidden');
   msg.textContent='';
+  NW_loadHistory();
+  NW_loadFleet();
 }
 async function NW_sendSettings(payload,check) {
   const msg=document.getElementById('nw-settings-message');
@@ -1592,6 +1572,7 @@ async function NW_sendSettings(payload,check) {
     if(!data.trackerSettings || !(await check(data.trackerSettings))) throw new Error('Setting not confirmed. Check the server-side Settings PIN configuration and try again.');
     NW_applySettings(data.trackerSettings);
     msg.textContent='Saved successfully.';
+    NW_loadHistory();
     showToastNotification('Settings saved.');
   } catch(e) {msg.textContent='Could not verify save: '+e.message;}
 }
@@ -1615,6 +1596,72 @@ function NW_saveSchedule() {
   });
 }
 
+
+
+// School-year schedule history and non-destructive fleet administration.
+async function NW_readExtension(action) {
+  const r=await fetch(GOOGLE_SCRIPT_URL+'?action='+encodeURIComponent(action)+'&_='+Date.now(),{cache:'no-store'});
+  if(!r.ok) throw new Error('Could not read Google Sheets ('+r.status+').');
+  const data=await r.json();
+  if(!data.success) throw new Error(data.error||'Request failed.');
+  return data;
+}
+async function NW_loadHistory() {
+  const el=document.getElementById('nw-history-list');if(!el)return;
+  try {
+    const data=(await NW_readExtension('nwScheduleHistory')).history;
+    const entries=data.entries||[];
+    if(!entries.length){el.textContent='No delays or closures recorded for '+data.schoolYear+'.';return;}
+    el.innerHTML='<p class="font-semibold mb-2">'+escapeHtml(data.schoolYear)+' school year · '+entries.length+' recorded adjustment(s)</p><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b"><th class="py-2">Date</th><th>Status</th><th>Notes</th><th></th></tr></thead><tbody>'+entries.map(x=>'<tr class="border-b"><td class="py-2 pr-3">'+escapeHtml(x.date)+'</td><td class="pr-3">'+escapeHtml(x.status)+'</td><td class="pr-3">'+escapeHtml(x.notes||'—')+'</td><td><button class="text-blue-700 underline" data-date="'+escapeHtml(x.date)+'" onclick="NW_editHistoryDate(this.dataset.date)">Edit</button></td></tr>').join('')+'</tbody></table></div>';
+  }catch(e){el.textContent='History unavailable: '+e.message;}
+}
+async function NW_editHistoryDate(date) {
+  document.getElementById('nw-schedule-date').value=date;
+  try {
+    const r=await fetch(GOOGLE_SCRIPT_URL+'?action=nwScheduleLookup&date='+encodeURIComponent(date)+'&_='+Date.now(),{cache:'no-store'});
+    if(!r.ok)throw new Error('Unable to load date.');
+    const x=await r.json();
+    document.getElementById('nw-schedule-status').value=x.status||'Normal Day';
+    document.getElementById('nw-schedule-notes').value=x.notes||'';
+    document.getElementById('nw-schedule-date').scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(e){document.getElementById('nw-settings-message').textContent=e.message;}
+}
+function NW_fleetActionChanged() {
+  const replace=document.getElementById('nw-fleet-action').value==='replace';
+  document.getElementById('nw-fleet-new-wrap').classList.toggle('hidden',!replace);
+}
+async function NW_loadFleet() {
+  const el=document.getElementById('nw-fleet-list');if(!el)return;
+  try {
+    const data=(await NW_readExtension('nwFleetList')).fleet;
+    document.getElementById('nw-route-options').innerHTML=data.map(x=>'<option value="'+escapeHtml(x.route)+'"></option>').join('');
+    el.innerHTML='<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">'+data.map(x=>'<div class="border rounded-lg px-3 py-2 flex justify-between gap-2"><span class="font-semibold">'+escapeHtml(x.route)+'</span><span class="text-xs '+(x.status==='Active'?'text-green-700':'text-slate-500')+'">'+escapeHtml(x.status)+'</span></div>').join('')+'</div>';
+  }catch(e){el.textContent='Fleet unavailable: '+e.message;}
+}
+async function NW_saveFleet() {
+  const mode=document.getElementById('nw-fleet-action').value;
+  let route=document.getElementById('nw-fleet-route').value.trim();
+  const newRoute=document.getElementById('nw-fleet-new').value.trim();
+  const msg=document.getElementById('nw-fleet-message');
+  if(/^\d+$/.test(route))route='Bus '+route;
+  const normalizedNew=/^\d+$/.test(newRoute)?'Bus '+newRoute:newRoute;
+  if(!/^Bus [A-Za-z0-9][A-Za-z0-9 -]{0,24}$/.test(route) || (mode==='replace'&&!/^Bus [A-Za-z0-9][A-Za-z0-9 -]{0,24}$/.test(normalizedNew))){msg.textContent='Enter a valid route, such as Bus 611.';return;}
+  const descriptions={add:'ADD '+route+' to active logging. This may create a new PDF report card.',deactivate:'DEACTIVATE '+route+'. Historical records remain; this route will no longer appear in daily logging.',reactivate:'REACTIVATE '+route+'. Its historical records remain available.',replace:'REPLACE '+route+' with '+normalizedNew+'. This creates a separate new route and PDF report card. The old route history stays under '+route+'.'};
+  if(!window.confirm(descriptions[mode]+'\n\nThis may affect future and historical reporting displays. No historical submissions will be deleted or rewritten.\n\nContinue?'))return;
+  msg.textContent='Saving fleet change…';
+  try {
+    await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',body:new URLSearchParams({action:'nwManageFleet',mode,route,newRoute:normalizedNew,pin:nwSettingsPin})});
+    await new Promise(resolve=>setTimeout(resolve,1800));
+    const fleet=(await NW_readExtension('nwFleetList')).fleet;
+    const status=id=>fleet.find(x=>x.route===id)?.status;
+    const okay=(mode==='add'||mode==='reactivate')?status(route)==='Active':mode==='deactivate'?status(route)==='Inactive':status(route)==='Inactive'&&status(normalizedNew)==='Active';
+    if(!okay)throw new Error('Google Sheets did not confirm the requested change. Check your PIN and route details.');
+    msg.textContent='Fleet change saved and confirmed.';
+    await NW_loadFleet();
+    refreshCloudData();
+    showToastNotification('Fleet updated. Historical arrivals preserved.');
+  }catch(e){msg.textContent='Fleet change not confirmed: '+e.message;}
+}
 
 </script>
 </body>
