@@ -988,8 +988,13 @@ function updatePrincipalDashboardUI() {
     const currentSession = getCurrentSessionSubmissions();
     const loggedRouteIds = currentSession.map(item => item.routeId);
     const missingBuses = activeBuses.filter(bus => !loggedRouteIds.includes(bus));
-    const lateArrivals = currentSession.filter(item => item.rawTime && item.rawTime > nwSettings.onTime);
-    const onTimeArrivals = currentSession.filter(item => item.rawTime && item.rawTime <= nwSettings.onTime);
+    // Live dashboard uses today's scheduled cutoff. Historical reporting still
+    // normalizes delayed arrivals against the regular-day cutoff in Code.gs.
+    const todayClosed = nwSettings.dayStatus === 'School Closure';
+    const todayDelayHours = ({'1-Hour Delay':1,'2-Hour Delay':2,'3-Hour Delay':3})[nwSettings.dayStatus] || 0;
+    const todayCutoff = NW_addHours(nwSettings.onTime || '09:20', todayDelayHours);
+    const lateArrivals = todayClosed ? [] : currentSession.filter(item => item.rawTime && item.rawTime > todayCutoff);
+    const onTimeArrivals = todayClosed ? [] : currentSession.filter(item => item.rawTime && item.rawTime <= todayCutoff);
     const onTimeCount = onTimeArrivals.length;
 
     document.getElementById("kpi-total").innerText = currentSession.length;
@@ -1069,7 +1074,9 @@ function updatePrincipalDashboardUI() {
 
     [...submissionsLog].reverse().forEach(log => {
         const row = document.createElement("tr");
-        const isLate = log.rawTime && log.rawTime > nwSettings.onTime;
+        // Avoid applying today's special schedule to historical rows.
+        const isToday = getRecordDateKey(log) === getTodayDateString();
+        const isLate = isToday && !todayClosed && log.rawTime && log.rawTime > todayCutoff;
         row.className = `transition-colors border-b border-slate-100 ${isLate ? "bg-rose-50/20" : "hover:bg-slate-50"}`;
         row.innerHTML = `
             <td class="p-4 text-xs font-semibold text-slate-500 tabular-nums">${escapeHtml(formatDisplayDate(getRecordDateKey(log)))}</td>
@@ -1535,6 +1542,8 @@ function NW_applySettings(s) {
   const date=document.getElementById('nw-schedule-date');if(date&&!date.value) date.value=s.date||'';
   const status=document.getElementById('nw-schedule-status');
   if(status && date && date.value===s.date && ['Normal Day','1-Hour Delay','2-Hour Delay','3-Hour Delay','School Closure'].includes(s.dayStatus)) status.value=s.dayStatus;
+  const principalContent = document.getElementById('principal-dashboard-content');
+  if (principalContent && !principalContent.classList.contains('hidden')) updatePrincipalDashboardUI();
 }
 function NW_addHours(s, hours) {
   const parts = String(s || '09:20').split(':').map(Number);
