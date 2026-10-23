@@ -321,12 +321,13 @@
     </section>
 
     <section id="view-settings" class="hidden space-y-5">
-      <div id="nw-settings-auth" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-lg space-y-4">
-        <h2 class="text-lg font-bold">Settings Access</h2>
-        <p class="text-sm text-slate-600">Enter the same PIN used for Staff Logging, Principal Portal, and Reports.</p>
-        <input id="nw-settings-pin" type="password" autocomplete="off" placeholder="Administrator PIN" class="w-full border border-slate-300 rounded-xl p-3" />
-        <button onclick="NW_openSettings()" class="bg-slate-900 text-white rounded-xl p-3 w-full font-semibold">Authorize Settings</button>
-        <p id="nw-settings-auth-msg" class="text-sm text-rose-600" role="status"></p>
+      <div id="nw-settings-auth" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-xl text-center space-y-5 my-8">
+        <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600 text-2xl" aria-hidden="true">🔒</div>
+        <h2 class="text-lg font-bold text-slate-900">Settings Verification</h2>
+        <p class="text-sm text-slate-500">Enter the same Bus Tracker PIN used on the other three pages.</p>
+        <input id="nw-settings-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="Bus Tracker PIN" class="w-full text-center border border-slate-300 rounded-xl py-3 px-4 text-lg tracking-widest" onkeydown="if(event.key==='Enter')NW_openSettings()" />
+        <p id="nw-settings-auth-msg" class="text-xs text-red-600 font-medium" role="status"></p>
+        <button type="button" onclick="NW_openSettings()" class="w-full bg-slate-900 text-white rounded-xl px-5 py-3 font-semibold">Authorize &amp; Open Settings</button>
       </div>
       <div id="nw-settings-content" class="hidden space-y-5">
         <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
@@ -354,6 +355,15 @@
           <div id="nw-history-list" class="text-sm text-slate-500">Loading schedule history…</div>
         </div>
         <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <h2 class="font-bold text-lg">Route Reporting Options</h2>
+          <label for="nw-include-inactive-reports" class="flex items-center justify-between gap-4 cursor-pointer">
+            <span><span class="block font-semibold text-slate-900">Include Inactive Routes in Reports</span><span class="block text-sm text-slate-500 mt-1">Off by default. When off, inactive routes do not appear in route overviews or generate individual PDF report cards. Their historical records remain saved.</span></span>
+            <input id="nw-include-inactive-reports" type="checkbox" class="h-6 w-6 shrink-0 accent-blue-600" aria-label="Include inactive routes in reports" />
+          </label>
+          <button type="button" onclick="NW_saveReportRoutes()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold">Save Reporting Option</button>
+          <p id="nw-report-routes-message" role="status" class="text-sm text-slate-600"></p>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
           <div class="flex items-center justify-between gap-3 flex-wrap"><div><h2 class="font-bold text-lg">Fleet Management</h2><p class="text-sm text-slate-500">Add, retire, reactivate, or replace routes. Original records are never rewritten.</p></div><button onclick="NW_loadFleet()" class="px-4 py-2 border rounded-lg text-sm font-semibold">Refresh Fleet</button></div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label class="text-sm font-semibold">Action<select id="nw-fleet-action" class="mt-2 w-full border rounded-lg p-3" onchange="NW_fleetActionChanged()"><option value="add">Add new route</option><option value="deactivate">Deactivate route</option><option value="reactivate">Reactivate route</option><option value="replace">Replace / renumber route</option></select></label>
@@ -361,7 +371,7 @@
             <label id="nw-fleet-new-wrap" class="text-sm font-semibold hidden">New route ID<input id="nw-fleet-new" class="mt-2 w-full border rounded-lg p-3" placeholder="Bus 999" maxlength="29" /></label>
             <datalist id="nw-route-options"></datalist>
           </div>
-          <div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm"><strong>Historical reporting warning:</strong> Fleet changes affect future check-ins and may change which routes appear in reports. Replacing a route creates a new report card for the new ID; the old route keeps its historical report card. No past arrivals will be changed.</div>
+          <div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm"><strong>Historical reporting warning:</strong> Fleet changes affect future check-ins and may change which routes appear in reports. Replacing a route creates a new report card for the new ID; the old route remains available in historical records and can be included using the reporting option above. No past arrivals will be changed.</div>
           <button onclick="NW_saveFleet()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold">Review &amp; Confirm Fleet Change</button>
           <p id="nw-fleet-message" role="status" class="text-sm text-slate-700"></p>
           <div id="nw-fleet-list" class="text-sm text-slate-500">Loading fleet…</div>
@@ -1566,6 +1576,8 @@ function NW_applySettings(s) {
   for (const [id,val] of [['nw-on-time',s.onTime],['nw-first-period',s.firstPeriod],['nw-high-impact',s.highImpact]]) {
     const input=document.getElementById(id);if(input && document.activeElement!==input) input.value=val||'';
   }
+  const includeInactive=document.getElementById('nw-include-inactive-reports');
+  if(includeInactive && document.activeElement!==includeInactive) includeInactive.checked=Boolean(s.includeInactiveReports);
   const date=document.getElementById('nw-schedule-date');if(date&&!date.value) date.value=s.date||'';
   const status=document.getElementById('nw-schedule-status');
   if(status && date && date.value===s.date && ['Normal Day','1-Hour Delay','2-Hour Delay','3-Hour Delay','School Closure'].includes(s.dayStatus)) status.value=s.dayStatus;
@@ -1608,6 +1620,21 @@ function NW_saveThresholds() {
   const highImpact=document.getElementById('nw-high-impact').value;
   if(!onTime||!firstPeriod||!highImpact||!(onTime<=firstPeriod&&firstPeriod<=highImpact)) {document.getElementById('nw-settings-message').textContent='Enter valid thresholds in chronological order.';return;}
   NW_sendSettings({mode:'thresholds',onTime,firstPeriod,highImpact},s=>s.onTime===onTime&&s.firstPeriod===firstPeriod&&s.highImpact===highImpact);
+}
+async function NW_saveReportRoutes() {
+  const input=document.getElementById('nw-include-inactive-reports');
+  const msg=document.getElementById('nw-report-routes-message');
+  const enabled=Boolean(input.checked);
+  msg.textContent='Saving reporting option…';
+  try {
+    await NW_api('nwSaveSettings',{mode:'reportRoutes',includeInactiveReports:String(enabled)});
+    const data=await NW_api('read');
+    if(!data.trackerSettings || Boolean(data.trackerSettings.includeInactiveReports)!==enabled) throw new Error('Could not verify the saved reporting option.');
+    NW_applySettings(data.trackerSettings);
+    msg.textContent=enabled?'Saved: inactive routes will appear in route reports and PDF report cards.':'Saved: inactive routes will be excluded from route reports and PDF report cards.';
+    showToastNotification('Reporting option saved.');
+    // Do not refresh all reporting sheets here; the next report request and weekly email use the setting.
+  } catch(error) {msg.textContent='Could not save: '+error.message;}
 }
 function NW_saveSchedule() {
   const date=document.getElementById('nw-schedule-date').value;
