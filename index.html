@@ -126,6 +126,11 @@
                 <div id="substitute-buses-list" class="flex flex-wrap gap-2 no-scrollbar max-h-36 overflow-y-auto"></div>
             </div>
 
+            <div class="bg-white p-5 rounded-2xl border border-rose-200 shadow-sm">
+                <h3 class="text-xs font-bold text-rose-700 uppercase tracking-wider mb-3">Flagged Incidents / Staff Notes — Today</h3>
+                <div id="principal-flagged-notes" class="flex flex-wrap gap-2"></div>
+            </div>
+
             <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">Submission Audit History Logs</h2>
@@ -407,7 +412,7 @@ function NW_api(action, params={}) {
     });
     document.body.append(iframe,form);
     const cleanup=()=>{nwPending.delete(requestId);form.remove();iframe.remove();};
-    const timer=setTimeout(()=>{cleanup();reject(new Error('Server request timed out. Check the Apps Script deployment.'));},35000);
+    const timer=setTimeout(()=>{cleanup();reject(new Error('Server request timed out. Check the Apps Script deployment.'));},110000);
     nwPending.set(requestId,{resolve,reject,timer,cleanup});form.submit();
   });
 }
@@ -656,16 +661,16 @@ window.onload = function() {
         console.error("Dashboard initialization error:", error);
     }
 
-    setInterval(()=>{if(nwAuthToken)refreshCloudData();},15000);
+    setInterval(()=>{if(nwAuthToken && !document.hidden)refreshCloudData();},30000);
 };
 
-function callGoogleScript(params, callback, errorCallback) {
+function callGoogleScript(params, callback, errorCallback, options={}) {
   if(!nwAuthToken){if(errorCallback)errorCallback(new Error('Please sign in.'));return;}
   const {action,...fields}=params;
   NW_api(action,fields).then(data=>{if(callback)callback(data);}).catch(error=>{
     console.error('Northwest API error:',error);
     if(errorCallback)errorCallback(error);
-    showToastNotification('⚠️ '+error.message);
+    if (!options.silent) showToastNotification('⚠️ '+error.message);
   });
 }
 
@@ -720,8 +725,17 @@ function applyCloudData(data) {
     updatePrincipalDashboardUI();
 }
 
+let nwReadInFlight = false;
 function refreshCloudData() {
-    callGoogleScript({ action: "read" }, applyCloudData);
+    if (!nwAuthToken || nwReadInFlight) return;
+    nwReadInFlight = true;
+    callGoogleScript({ action: "read" }, data => {
+        nwReadInFlight = false;
+        applyCloudData(data);
+    }, error => {
+        nwReadInFlight = false;
+        console.warn('Background data refresh failed; will retry on next interval.', error);
+    }, {silent:true});
 }
 
 // ---------------------------------------------------------
@@ -1036,8 +1050,8 @@ function updatePrincipalDashboardUI() {
     const todayClosed = nwSettings.dayStatus === 'School Closure';
     const todayDelayHours = ({'1-Hour Delay':1,'2-Hour Delay':2,'3-Hour Delay':3})[nwSettings.dayStatus] || 0;
     const todayCutoff = NW_addHours(nwSettings.onTime || '09:20', todayDelayHours);
-    const lateArrivals = todayClosed ? [] : currentSession.filter(item => item.rawTime && item.rawTime > todayCutoff);
-    const onTimeArrivals = todayClosed ? [] : currentSession.filter(item => item.rawTime && item.rawTime <= todayCutoff);
+    const lateArrivals = currentSession.filter(item => item.rawTime && item.rawTime > todayCutoff);
+    const onTimeArrivals = currentSession.filter(item => item.rawTime && item.rawTime <= todayCutoff);
     const onTimeCount = onTimeArrivals.length;
 
     document.getElementById("kpi-total").innerText = currentSession.length;
@@ -1073,6 +1087,29 @@ function updatePrincipalDashboardUI() {
                 badge.className = "bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs px-2.5 py-1 rounded-xl shadow-sm";
                 badge.innerText = `${log.routeId} → ${log.substitution}`;
                 substituteContainer.appendChild(badge);
+            });
+        }
+    }
+
+    // Only today's records appear here; escape all staff-entered text.
+    const flaggedContainer = document.getElementById("principal-flagged-notes");
+    if (flaggedContainer) {
+        const flagged = currentSession.filter(item => {
+            const note = String(item.notes || "").trim();
+            return note && note.toLowerCase() !== "n/a" && note.toLowerCase() !== "none";
+        });
+        flaggedContainer.replaceChildren();
+        if (!flagged.length) {
+            flaggedContainer.innerHTML = '<span class="text-xs text-slate-500 font-medium italic py-1">No flagged incidents or staff notes recorded today.</span>';
+        } else {
+            flagged.forEach(log => {
+                const bubble = document.createElement("div");
+                bubble.className = "bg-rose-50 text-rose-800 border border-rose-200 rounded-xl px-3 py-2 text-sm shadow-sm max-w-full break-words";
+                const routeLabel = document.createElement("strong");
+                routeLabel.className = "font-bold";
+                routeLabel.textContent = log.routeId + " — ";
+                bubble.append(routeLabel, document.createTextNode(String(log.notes).trim()));
+                flaggedContainer.appendChild(bubble);
             });
         }
     }
@@ -1119,7 +1156,7 @@ function updatePrincipalDashboardUI() {
         const row = document.createElement("tr");
         // Avoid applying today's special schedule to historical rows.
         const isToday = getRecordDateKey(log) === getTodayDateString();
-        const isLate = isToday && !todayClosed && log.rawTime && log.rawTime > todayCutoff;
+        const isLate = isToday && log.rawTime && log.rawTime > todayCutoff;
         row.className = `transition-colors border-b border-slate-100 ${isLate ? "bg-rose-50/20" : "hover:bg-slate-50"}`;
         row.innerHTML = `
             <td class="p-4 text-xs font-semibold text-slate-500 tabular-nums">${escapeHtml(formatDisplayDate(getRecordDateKey(log)))}</td>
@@ -1163,15 +1200,25 @@ async function verifyReportsAccess() {
     document.getElementById('reports-auth-wall').classList.add('hidden');
     document.getElementById('reports-dashboard-content').classList.remove('hidden');
     fetchReportData(true);
-    if(!reportRefreshTimer)reportRefreshTimer=setInterval(()=>{if(reportsAuthorized&&nwAuthToken)fetchReportData(false);},60000);
+    if(!reportRefreshTimer)reportRefreshTimer=setInterval(()=>{if(reportsAuthorized&&nwAuthToken&&!document.getElementById('view-reports').classList.contains('hidden'))fetchReportData(false);},60000);
   } catch(error) {
     document.getElementById('reports-auth-error').textContent=error.message;
     document.getElementById('reports-auth-error').classList.remove('hidden');field.value='';
   }
 }
 
+let nwReportInFlight = false;
+let nwReportPendingWeek = null;
 function fetchReportData(showNotice) {
     if (!reportsAuthorized) return;
+    if (nwReportInFlight) {
+        // An in-progress request should not cause another expensive calculation.
+        // The latest requested week is refreshed after it completes.
+        nwReportPendingWeek = appSelectedReportWeek;
+        return;
+    }
+    nwReportInFlight = true;
+    const requestedWeek = appSelectedReportWeek;
 
     const reportParams = { action: "report" };
     if (appSelectedReportWeek) {
@@ -1179,6 +1226,13 @@ function fetchReportData(showNotice) {
     }
 
     callGoogleScript(reportParams, function(data) {
+        nwReportInFlight = false;
+        if (nwReportPendingWeek !== null) {
+            const nextWeek = nwReportPendingWeek;
+            nwReportPendingWeek = null;
+            if (nextWeek !== requestedWeek) { fetchReportData(false); return; }
+        }
+        if (requestedWeek !== appSelectedReportWeek) return;
         if (!data || !data.reporting) {
             showToastNotification("⚠️ Reporting API not found. Update Apps Script with the reporting add-on.");
             return;
@@ -1189,7 +1243,10 @@ function fetchReportData(showNotice) {
         if (showNotice) {
             showToastNotification("Reports refreshed from Google Sheets.");
         }
-    });
+    }, function(error) {
+        nwReportInFlight = false;
+        console.warn('Report refresh failed.', error);
+    }, {silent: !showNotice});
 }
 
 function renderReportsDashboard(reporting) {
@@ -1570,9 +1627,9 @@ function NW_applySettings(s) {
     const delayHours = ({'1-Hour Delay':1,'2-Hour Delay':2,'3-Hour Delay':3})[s.dayStatus] || 0;
     const cutoffBase = s.onTime || '09:20';
     const cutoffAdjusted = NW_addHours(cutoffBase, delayHours);
-    banner.textContent = 'Today’s Schedule: ' + (s.dayStatus || 'Normal Day') + (s.dayNotes ? ' — ' + s.dayNotes : '') + (closed ? ' · No bus arrival cutoff (school closed)' : ' · On-time cutoff ' + NW_fmtTime(cutoffAdjusted) + (delayHours ? ' (regular cutoff ' + NW_fmtTime(cutoffBase) + ')' : ''));
+    banner.textContent = 'Today’s Schedule: ' + (s.dayStatus || 'Normal Day') + (s.dayNotes ? ' — ' + s.dayNotes : '') + (closed ? ' · Operational arrivals enabled · On-time cutoff ' + NW_fmtTime(cutoffBase) + ' · Excluded from instructional-impact reports' : ' · On-time cutoff ' + NW_fmtTime(cutoffAdjusted) + (delayHours ? ' (regular cutoff ' + NW_fmtTime(cutoffBase) + ')' : ''));
   }
-  document.querySelectorAll('.nw-cutoff-label').forEach(el=>el.textContent=s.dayStatus==='School Closure'?'School Closed':NW_fmtTime(NW_addHours(s.onTime||'09:20',({'1-Hour Delay':1,'2-Hour Delay':2,'3-Hour Delay':3})[s.dayStatus]||0)));
+  document.querySelectorAll('.nw-cutoff-label').forEach(el=>el.textContent=NW_fmtTime(NW_addHours(s.onTime||'09:20',({'1-Hour Delay':1,'2-Hour Delay':2,'3-Hour Delay':3})[s.dayStatus]||0)));
   for (const [id,val] of [['nw-on-time',s.onTime],['nw-first-period',s.firstPeriod],['nw-high-impact',s.highImpact]]) {
     const input=document.getElementById(id);if(input && document.activeElement!==input) input.value=val||'';
   }
