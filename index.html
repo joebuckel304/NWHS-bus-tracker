@@ -83,6 +83,7 @@
         </div>
 
         <div id="principal-dashboard-content" class="hidden space-y-6">
+            <div id="nw-principal-day-banner" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-900">Today's Schedule: Loading…</div>
             <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Submissions</div>
@@ -1628,6 +1629,11 @@ function NW_applySettings(s) {
     const cutoffBase = s.onTime || '09:20';
     const cutoffAdjusted = NW_addHours(cutoffBase, delayHours);
     banner.textContent = 'Today’s Schedule: ' + (s.dayStatus || 'Normal Day') + (s.dayNotes ? ' — ' + s.dayNotes : '') + (closed ? ' · Operational arrivals enabled · On-time cutoff ' + NW_fmtTime(cutoffBase) + ' · Excluded from instructional-impact reports' : ' · On-time cutoff ' + NW_fmtTime(cutoffAdjusted) + (delayHours ? ' (regular cutoff ' + NW_fmtTime(cutoffBase) + ')' : ''));
+    const principalBanner = document.getElementById('nw-principal-day-banner');
+    if (principalBanner) {
+      principalBanner.className = banner.className;
+      principalBanner.textContent = banner.textContent;
+    }
   }
   document.querySelectorAll('.nw-cutoff-label').forEach(el=>el.textContent=NW_fmtTime(NW_addHours(s.onTime||'09:20',({'1-Hour Delay':1,'2-Hour Delay':2,'3-Hour Delay':3})[s.dayStatus]||0)));
   for (const [id,val] of [['nw-on-time',s.onTime],['nw-first-period',s.firstPeriod],['nw-high-impact',s.highImpact]]) {
