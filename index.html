@@ -364,8 +364,19 @@
           <h2 class="font-bold text-lg">Route Reporting Options</h2>
           <label for="nw-include-inactive-reports" class="flex items-center justify-between gap-4 cursor-pointer">
             <span><span class="block font-semibold text-slate-900">Include Inactive Routes in Reports</span><span class="block text-sm text-slate-500 mt-1">Off by default. When off, inactive routes do not appear in route overviews or generate individual PDF report cards. Their historical records remain saved.</span></span>
-            <input id="nw-include-inactive-reports" type="checkbox" class="h-6 w-6 shrink-0 accent-blue-600" aria-label="Include inactive routes in reports" />
+            <input id="nw-include-inactive-reports" type="checkbox" onchange="NW_toggleInactiveRouteChoices()" class="h-6 w-6 shrink-0 accent-blue-600" aria-label="Include inactive routes in reports" />
           </label>
+          <div id="nw-inactive-route-selection" class="hidden rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <div><h3 class="font-semibold text-slate-900">Choose inactive routes to include</h3><p class="text-xs text-slate-500 mt-1">Only checked routes will appear in route-level reports and PDF report cards, if they have data for the school year.</p></div>
+              <button type="button" onclick="NW_loadInactiveReportChoices()" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-xs font-semibold">Refresh Routes</button>
+            </div>
+            <div id="nw-inactive-route-choices" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm text-slate-600">Loading inactive routes…</div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick="NW_selectAllInactiveRoutes(true)" class="text-xs font-semibold text-blue-700 underline">Select all</button>
+              <button type="button" onclick="NW_selectAllInactiveRoutes(false)" class="text-xs font-semibold text-blue-700 underline">Clear selection</button>
+            </div>
+          </div>
           <button type="button" onclick="NW_saveReportRoutes()" class="bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold">Save Reporting Option</button>
           <p id="nw-report-routes-message" role="status" class="text-sm text-slate-600"></p>
         </div>
@@ -1641,6 +1652,8 @@ function NW_applySettings(s) {
   }
   const includeInactive=document.getElementById('nw-include-inactive-reports');
   if(includeInactive && document.activeElement!==includeInactive) includeInactive.checked=Boolean(s.includeInactiveReports);
+  NW_toggleInactiveRouteChoices();
+  if(Array.isArray(s.selectedInactiveReportRoutes)) nwSavedInactiveReportRoutes=s.selectedInactiveReportRoutes.slice();
   const date=document.getElementById('nw-schedule-date');if(date&&!date.value) date.value=s.date||'';
   const status=document.getElementById('nw-schedule-status');
   if(status && date && date.value===s.date && ['Normal Day','1-Hour Delay','2-Hour Delay','3-Hour Delay','School Closure'].includes(s.dayStatus)) status.value=s.dayStatus;
@@ -1663,7 +1676,7 @@ async function NW_openSettings() {
     await NW_authenticate(field.value);field.value='';
     document.getElementById('nw-settings-auth').classList.add('hidden');
     document.getElementById('nw-settings-content').classList.remove('hidden');
-    msg.textContent='';NW_loadHistory();NW_loadFleet();
+    msg.textContent='';NW_loadHistory();NW_loadFleet();NW_loadInactiveReportChoices();
   } catch(error){msg.textContent=error.message;field.value='';}
 }
 async function NW_sendSettings(payload,check) {
@@ -1684,19 +1697,56 @@ function NW_saveThresholds() {
   if(!onTime||!firstPeriod||!highImpact||!(onTime<=firstPeriod&&firstPeriod<=highImpact)) {document.getElementById('nw-settings-message').textContent='Enter valid thresholds in chronological order.';return;}
   NW_sendSettings({mode:'thresholds',onTime,firstPeriod,highImpact},s=>s.onTime===onTime&&s.firstPeriod===firstPeriod&&s.highImpact===highImpact);
 }
+let nwSavedInactiveReportRoutes=[];
+function NW_toggleInactiveRouteChoices() {
+  const toggle=document.getElementById('nw-include-inactive-reports');
+  const section=document.getElementById('nw-inactive-route-selection');
+  if(toggle && section) section.classList.toggle('hidden',!toggle.checked);
+}
+function NW_selectAllInactiveRoutes(checked) {
+  document.querySelectorAll('#nw-inactive-route-choices input[type="checkbox"]').forEach(x=>x.checked=checked);
+}
+async function NW_loadInactiveReportChoices() {
+  const container=document.getElementById('nw-inactive-route-choices');
+  if(!container)return;
+  // Preserve unsaved selections if refreshing the list manually.
+  const oldChecks=Array.from(container.querySelectorAll('input[type="checkbox"]'));
+  const pending=oldChecks.length ? oldChecks.filter(x=>x.checked).map(x=>x.value) : nwSavedInactiveReportRoutes;
+  container.textContent='Loading inactive routes…';
+  try {
+    const fleet=(await NW_readExtension('nwFleetList')).fleet;
+    const inactive=fleet.filter(x=>x.status==='Inactive');
+    if(!inactive.length){container.textContent='No inactive routes are available.';return;}
+    container.replaceChildren();
+    inactive.forEach(x=>{
+      const label=document.createElement('label');
+      label.className='flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 cursor-pointer';
+      const check=document.createElement('input');
+      check.type='checkbox';check.value=x.route;check.checked=pending.includes(x.route);
+      check.className='h-5 w-5 accent-blue-600';
+      const text=document.createElement('span');text.className='font-medium text-slate-800';text.textContent=x.route;
+      label.append(check,text);container.appendChild(label);
+    });
+  }catch(e){container.textContent='Could not load inactive routes: '+e.message;}
+}
 async function NW_saveReportRoutes() {
   const input=document.getElementById('nw-include-inactive-reports');
   const msg=document.getElementById('nw-report-routes-message');
   const enabled=Boolean(input.checked);
+  const checks=Array.from(document.querySelectorAll('#nw-inactive-route-choices input[type="checkbox"]'));
+  if(enabled && !checks.length){msg.textContent='No inactive route choices are loaded. Refresh Routes before saving.';return;}
+  const selected=checks.filter(x=>x.checked).map(x=>x.value);
   msg.textContent='Saving reporting option…';
   try {
-    await NW_api('nwSaveSettings',{mode:'reportRoutes',includeInactiveReports:String(enabled)});
+    await NW_api('nwSaveSettings',{mode:'reportRoutes',includeInactiveReports:String(enabled),selectedInactiveReportRoutes:JSON.stringify(selected)});
     const data=await NW_api('read');
-    if(!data.trackerSettings || Boolean(data.trackerSettings.includeInactiveReports)!==enabled) throw new Error('Could not verify the saved reporting option.');
-    NW_applySettings(data.trackerSettings);
-    msg.textContent=enabled?'Saved: inactive routes will appear in route reports and PDF report cards.':'Saved: inactive routes will be excluded from route reports and PDF report cards.';
+    const settings=data.trackerSettings||{};
+    const saved=Array.isArray(settings.selectedInactiveReportRoutes)?settings.selectedInactiveReportRoutes:[];
+    if(Boolean(settings.includeInactiveReports)!==enabled || JSON.stringify(saved.slice().sort())!==JSON.stringify(selected.slice().sort())) throw new Error('Could not verify the saved reporting option.');
+    NW_applySettings(settings);
+    msg.textContent=enabled?'Saved: '+selected.length+' selected inactive route(s) will be eligible for route reports and PDF report cards.':'Saved: all inactive routes will be excluded from route reports and PDF report cards.';
     showToastNotification('Reporting option saved.');
-    // Do not refresh all reporting sheets here; the next report request and weekly email use the setting.
+    // The next report request and scheduled PDF use the saved selection.
   } catch(error) {msg.textContent='Could not save: '+error.message;}
 }
 function NW_saveSchedule() {
