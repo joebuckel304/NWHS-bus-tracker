@@ -43,6 +43,9 @@
 
     <section id="view-logging" class="space-y-6">
         <div id="nw-day-banner" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-900">Today's Schedule: Loading…</div>
+        <div id="nw-staff-all-arrived" class="hidden rounded-2xl border border-emerald-300 bg-emerald-50 p-4 sm:p-5 text-center shadow-sm" aria-live="polite">
+            <img src="northwest-viking-all-buses-arrived.png" alt="Smiling Northwest Viking holding an All Buses Arrived sign" class="mx-auto w-full max-w-[230px] sm:max-w-[270px] h-auto" loading="lazy">
+        </div>
         <div id="staff-auth-wall" class="bg-white border border-slate-200 rounded-2xl p-8 max-w-md mx-auto shadow-xl text-center space-y-5 my-8">
             <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">🔒</div>
             <div>
@@ -84,6 +87,9 @@
 
         <div id="principal-dashboard-content" class="hidden space-y-6">
             <div id="nw-principal-day-banner" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-900">Today's Schedule: Loading…</div>
+            <div id="nw-principal-all-arrived" class="hidden rounded-2xl border border-emerald-300 bg-emerald-50 p-4 sm:p-5 text-center shadow-sm" aria-live="polite">
+            <img src="northwest-viking-all-buses-arrived.png" alt="Smiling Northwest Viking holding an All Buses Arrived sign" class="mx-auto w-full max-w-[230px] sm:max-w-[270px] h-auto" loading="lazy">
+            </div>
             <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Submissions</div>
@@ -927,7 +933,23 @@ function showToastNotification(message) {
 // ---------------------------------------------------------
 // STAFF SCREEN
 // ---------------------------------------------------------
+// Celebration is presentation-only: never changes arrivals, reporting, or saves.
+function NW_updateAllArrivedCelebration() {
+    const routes = Array.isArray(activeBuses) ? [...new Set(activeBuses.filter(Boolean))] : [];
+    const confirmedRoutes = new Set(getCurrentSessionSubmissions().map(item => item.routeId));
+    // Require a real fleet, and suppress the celebration while an arrival is
+    // being edited or an unverified submission is still in flight.
+    const allArrived = routes.length > 0 &&
+        routes.every(route => confirmedRoutes.has(route) && !editingRoutes.has(route)) &&
+        submissionsInFlight.size === 0;
+    ['nw-staff-all-arrived', 'nw-principal-all-arrived'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.classList.toggle('hidden', !allArrived);
+    });
+}
+
 function renderStaffLoggingPanel() {
+    NW_updateAllArrivedCelebration();
     const container = document.getElementById("bus-cards-container");
     if (!container) return;
 
@@ -1177,6 +1199,7 @@ async function verifyAdminAccess() {
 }
 
 function updatePrincipalDashboardUI() {
+    NW_updateAllArrivedCelebration();
     const currentSession = getCurrentSessionSubmissions();
     const loggedRouteIds = currentSession.map(item => item.routeId);
     const missingBuses = activeBuses.filter(bus => !loggedRouteIds.includes(bus));
