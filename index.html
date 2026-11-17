@@ -649,6 +649,10 @@ function normalizeSubmissionRecord(item) {
     return item;
 }
 
+// Session-only records confirmed by the exact request ID. Keep them visible
+// until a fresh cloud read includes the record; never treat unverified saves as arrived.
+const nwVerifiedAwaitingSync = new Map();
+
 let sessionResetCutoff = Number(localStorage.getItem(SESSION_RESET_KEY) || 0);
 
 try {
@@ -674,6 +678,15 @@ function getCurrentSessionSubmissions() {
         .sort((a,b) => getRecordEpoch(a) - getRecordEpoch(b));
     const latestByRoute = new Map();
     confirmed.forEach(item => latestByRoute.set(item.routeId,item));
+    // A successful verifySubmission is authoritative even if a previously
+    // started dashboard read finishes with an older snapshot.
+    nwVerifiedAwaitingSync.forEach(item => {
+        if (getRecordDateKey(item) !== today || (cutoff && getRecordEpoch(item) <= cutoff)) return;
+        const cloud = latestByRoute.get(item.routeId);
+        if (!cloud || cloud.id === item.id || getRecordEpoch(cloud) <= getRecordEpoch(item)) {
+            latestByRoute.set(item.routeId, item);
+        }
+    });
     return [...latestByRoute.values()];
 }
 function savePendingLocal() {
@@ -687,6 +700,16 @@ function setPendingState(routeId,state) {
     if(item){item.saveState=state;savePendingLocal();}
     renderStaffLoggingPanel();
     updatePrincipalDashboardUI();
+}
+function nwMarkVerifiedAndSync(local) {
+    // Called only after the server confirms the stable request ID exists.
+    nwVerifiedAwaitingSync.set(local.routeId, {...local});
+    pendingLocalSubmissions = pendingLocalSubmissions.filter(x => x.id !== local.id);
+    savePendingLocal();
+    // Render before the success toast. Do not wait for a second cloud read.
+    renderStaffLoggingPanel();
+    updatePrincipalDashboardUI();
+    refreshCloudData();
 }
 function confirmedRecordMatches(localItem, rows) {
     return (rows||[]).some(row => {
@@ -703,10 +726,7 @@ function confirmPendingFromRead(routeId, {notify=true, retryOnUnknown=false}={})
     if(!local)return;
     callGoogleScript({action:'verifySubmission',requestId:local.id}, data=>{
         if(data.found){
-            pendingLocalSubmissions=pendingLocalSubmissions.filter(x=>x.id!==local.id);
-            savePendingLocal();
-            refreshCloudData();
-            renderStaffLoggingPanel();updatePrincipalDashboardUI();
+            nwMarkVerifiedAndSync(local);
             if(notify)showToastNotification(`${routeId} saved and verified in Google Sheets.`);
         } else {
             setPendingState(routeId,'failed');
@@ -725,8 +745,7 @@ function retryBusSave(routeId) {
     callGoogleScript({action:'verifySubmission',requestId:record.id}, data=>{
         if(data.found){
             submissionsInFlight.delete(routeId);
-            pendingLocalSubmissions=pendingLocalSubmissions.filter(x=>x.id!==record.id);
-            savePendingLocal();refreshCloudData();renderStaffLoggingPanel();updatePrincipalDashboardUI();
+            nwMarkVerifiedAndSync(record);
             showToastNotification(`${routeId} was already saved in Google Sheets.`);
         } else sendPendingBusRecord(record);
     }, error=>{
@@ -793,6 +812,15 @@ function applyCloudData(data) {
         submissionsLog = incomingSubmissions
             .map(normalizeSubmissionRecord)
             .filter(item => item && (item.id || item.routeId));
+
+        // Retire the verified local bridge only when the server's read
+        // actually includes that same request ID. Older in-flight reads
+        // must not revert a confirmed card to Pending.
+        nwVerifiedAwaitingSync.forEach((local, routeId) => {
+            if (submissionsLog.some(cloud => String(cloud.id || '') === String(local.id))) {
+                nwVerifiedAwaitingSync.delete(routeId);
+            }
+        });
 
         // Remove optimistic local records once the same route/time is visible from Google Sheets.
         pendingLocalSubmissions = pendingLocalSubmissions.filter(localItem => {
@@ -1086,6 +1114,7 @@ function undoSubmission(routeId) {
         return;
     }
 
+    nwVerifiedAwaitingSync.delete(routeId);
     staffDrafts.set(routeId, {
         time: record.rawTime || rawTimeFromDisplay(record.arrivalTime || ""),
         substitution: record.substitution && record.substitution !== "None" ? record.substitution : "",
