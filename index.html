@@ -449,7 +449,7 @@ function NW_api(action, params={}) {
     });
     document.body.append(iframe,form);
     const cleanup=()=>{nwPending.delete(replyId);form.remove();iframe.remove();};
-    const timer=setTimeout(()=>{cleanup();reject(new Error('Server request timed out. Check the Apps Script deployment.'));},110000);
+    const timer=setTimeout(()=>{cleanup();reject(new Error('Server request timed out. Check the Apps Script deployment.'));},40000);
     nwPending.set(replyId,{resolve,reject,timer,cleanup});form.submit();
   });
 }
@@ -696,24 +696,25 @@ function confirmedRecordMatches(localItem, rows) {
              (cloud.rawTime===localItem.rawTime || cloud.arrivalTime===localItem.arrivalTime)));
     });
 }
-function confirmPendingFromRead(routeId, {notify=true}={}) {
+// Confirm by the exact stable request ID. A lost iframe response must never
+// be interpreted as a failed write, and retries must reuse the same ID.
+function confirmPendingFromRead(routeId, {notify=true, retryOnUnknown=false}={}) {
     const local=pendingForRoute(routeId);
     if(!local)return;
-    callGoogleScript({action:'read'}, data=>{
-        // Read is authoritative; do not count local items as arrivals.
-        applyCloudData(data);
-        if(confirmedRecordMatches(local, data.submissions || data.currentSubmissions)) {
+    callGoogleScript({action:'verifySubmission',requestId:local.id}, data=>{
+        if(data.found){
             pendingLocalSubmissions=pendingLocalSubmissions.filter(x=>x.id!==local.id);
             savePendingLocal();
+            refreshCloudData();
             renderStaffLoggingPanel();updatePrincipalDashboardUI();
             if(notify)showToastNotification(`${routeId} saved and verified in Google Sheets.`);
         } else {
             setPendingState(routeId,'failed');
-            if(notify)showToastNotification(`⚠️ ${routeId} was not verified in Google Sheets. Tap Retry Save.`);
+            if(notify)showToastNotification(`⚠️ ${routeId} not yet confirmed. Tap Retry Save to check again.`);
         }
     }, error=>{
         setPendingState(routeId,'failed');
-        if(notify)showToastNotification(`⚠️ Could not verify ${routeId}. Check connection and tap Retry Save.`);
+        if(notify)showToastNotification(`⚠️ Could not confirm ${routeId}. Tap Retry Save to check again.`);
     }, {silent:true});
 }
 function retryBusSave(routeId) {
@@ -721,13 +722,11 @@ function retryBusSave(routeId) {
     if(!record || submissionsInFlight.has(routeId))return;
     submissionsInFlight.add(routeId);
     setPendingState(routeId,'saving');
-    // Recheck first: the earlier request might have committed despite a timeout.
-    callGoogleScript({action:'read'}, data=>{
-        applyCloudData(data);
-        if(confirmedRecordMatches(record,data.submissions || data.currentSubmissions)){
+    callGoogleScript({action:'verifySubmission',requestId:record.id}, data=>{
+        if(data.found){
             submissionsInFlight.delete(routeId);
             pendingLocalSubmissions=pendingLocalSubmissions.filter(x=>x.id!==record.id);
-            savePendingLocal();renderStaffLoggingPanel();updatePrincipalDashboardUI();
+            savePendingLocal();refreshCloudData();renderStaffLoggingPanel();updatePrincipalDashboardUI();
             showToastNotification(`${routeId} was already saved in Google Sheets.`);
         } else sendPendingBusRecord(record);
     }, error=>{
@@ -744,13 +743,12 @@ function sendPendingBusRecord(record) {
         substitution:record.substitution,notes:record.notes
     }, data=>{
         submissionsInFlight.delete(routeId);
-        // A successful HTTP response alone is not proof of persistence.
         confirmPendingFromRead(routeId);
     }, error=>{
         submissionsInFlight.delete(routeId);
-        // Timeout may mean unknown outcome. Yellow until Sheet read proves success.
-        setPendingState(routeId,'failed');
-        showToastNotification(`⚠️ ${routeId} save not confirmed. Tap Retry Save.`);
+        // A 40-second timeout is an UNKNOWN outcome, not proof of failure.
+        // Check the ID once; the original request may have saved successfully.
+        confirmPendingFromRead(routeId);
     },{silent:true});
 }
 
@@ -836,7 +834,7 @@ function applyCloudData(data) {
 
 let nwReadInFlight = false;
 function refreshCloudData() {
-    if (!nwAuthToken || nwReadInFlight) return;
+    if (!nwAuthToken || nwReadInFlight || submissionsInFlight.size > 0) return;
     nwReadInFlight = true;
     callGoogleScript({ action: "read" }, data => {
         nwReadInFlight = false;
