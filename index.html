@@ -768,7 +768,15 @@ function sendPendingBusRecord(record) {
         substitution:record.substitution,notes:record.notes
     }, data=>{
         submissionsInFlight.delete(routeId);
-        confirmPendingFromRead(routeId);
+        // A successful server response is authoritative: Apps Script only
+        // returns saved:true after the write/duplicate check completes.
+        if (data && data.saved === true && String(data.requestId) === String(record.id)) {
+            nwMarkVerifiedAndSync(record);
+            showToastNotification(`${routeId} saved in Google Sheets.`);
+        } else {
+            // Compatibility fallback for an older backend deployment.
+            confirmPendingFromRead(routeId);
+        }
     }, error=>{
         submissionsInFlight.delete(routeId);
         // A 40-second timeout is an UNKNOWN outcome, not proof of failure.
@@ -1079,6 +1087,13 @@ function stampCurrentTime(idx) {
     field.value = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
+let nwLastRequestEpoch = 0;
+function nwNextRequestId() {
+    const epoch = Math.max(Date.now(), nwLastRequestEpoch + 1);
+    nwLastRequestEpoch = epoch;
+    return `log_${epoch}`;
+}
+
 function submitBusRecord(routeId, idx) {
     // Prevent double-clicks / overlapping submit requests for the same route.
     if (submissionsInFlight.has(routeId)) {
@@ -1101,7 +1116,7 @@ function submitBusRecord(routeId, idx) {
 
     const now = new Date();
     const optimisticRecord = {
-        id: `log_${Date.now()}`,
+        id: nwNextRequestId(),
         date: getTodayDateString(),
         timestamp: now.toLocaleString("en-US"),
         routeId,
